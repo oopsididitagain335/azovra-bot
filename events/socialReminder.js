@@ -3,12 +3,17 @@ const { EmbedBuilder } = require('discord.js');
 module.exports = {
   name: 'ready',
   once: true,
-  async execute(client, railwayDB) { // ✅ Accept railwayDB — DO NOT import from index.js!
+  async execute(client, railwayDB) {
     console.log('✅ Social reminder system initialized.');
-
     const DEFAULT_X_LINK = "https://x.com/theazorva";
-    const DEFAULT_ANNOUNCE_CHANNEL_ID = "1416834521327996928"; // Where reminder is sent
-    const DEFAULT_SOCIALS_CHANNEL_ID = "1417169776916168714";   // Mentioned in message
+    const DEFAULT_ANNOUNCE_CHANNEL_ID = "1416834521327996928";
+    const DEFAULT_SOCIALS_CHANNEL_ID = "1417169776916168714";
+
+    // Validate railwayDB
+    if (!railwayDB || typeof railwayDB.get !== 'function') {
+      console.error('❌ ERROR: railwayDB is invalid or missing get method:', railwayDB);
+      return;
+    }
 
     // Pre-configure DB for each guild
     try {
@@ -19,14 +24,12 @@ module.exports = {
           await railwayDB.set(`x_link_${guild.id}`, DEFAULT_X_LINK);
           console.log(`🔑 Set X link for ${guild.name}: ${DEFAULT_X_LINK}`);
         }
-
         // Set socials channel
         const currentSocialsChannel = await railwayDB.get(`socials_channel_${guild.id}`);
         if (!currentSocialsChannel) {
           await railwayDB.set(`socials_channel_${guild.id}`, DEFAULT_SOCIALS_CHANNEL_ID);
           console.log(`🔑 Set socials channel for ${guild.name}: #${DEFAULT_SOCIALS_CHANNEL_ID}`);
         }
-
         // Set announcement channel
         const currentAnnounceChannel = await railwayDB.get(`announce_channel_${guild.id}`);
         if (!currentAnnounceChannel) {
@@ -45,13 +48,11 @@ module.exports = {
           const xLink = (await railwayDB.get(`x_link_${guild.id}`))?.trim() || DEFAULT_X_LINK;
           const socialsChannelId = await railwayDB.get(`socials_channel_${guild.id}`) || DEFAULT_SOCIALS_CHANNEL_ID;
           const announceChannelId = await railwayDB.get(`announce_channel_${guild.id}`) || DEFAULT_ANNOUNCE_CHANNEL_ID;
-
           const announceChannel = guild.channels.cache.get(announceChannelId);
           if (!announceChannel || !announceChannel.isTextBased()) {
             console.log(`⚠️ Announcement channel (${announceChannelId}) not found in ${guild.name}.`);
             continue;
           }
-
           const embed = new EmbedBuilder()
             .setColor('#1DA1F2')
             .setTitle('✨ Support Our Community!')
@@ -62,7 +63,6 @@ module.exports = {
             .setThumbnail('https://abs.twimg.com/icons/apple-touch-icon-192x192.png')
             .setFooter({ text: 'Your support means everything to us ❤️' })
             .setTimestamp();
-
           await announceChannel.send({ embeds: [embed] });
           console.log(`✅ Sent social reminder in ${guild.name} → #${announceChannelId}`);
         }
@@ -70,7 +70,6 @@ module.exports = {
         console.error('❌ Error sending social reminder:', error);
       }
     }, 2 * 60 * 60 * 1000); // Every 2 hours
-
     console.log('🕗 Social reminders scheduled (every 2 hours).');
   }
 };
