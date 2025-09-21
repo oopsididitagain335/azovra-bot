@@ -3,7 +3,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBui
 const ticketCategories = require('../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder() // ✅ "data" property — this was missing!
+   new SlashCommandBuilder() // ← This line starts with "data:"
     .setName('sec')
     .setDescription('🔐 Sends the ticket panel to the designated channel.'),
 
