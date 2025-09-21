@@ -1,8 +1,9 @@
+// commands/tickets/sec.js
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-const ticketCategories = require('../config/ticketCategories.js'); // ✅ Added .js
+const ticketCategories = require('../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder()
+   new SlashCommandBuilder() // ✅ "data" property — this was missing!
     .setName('sec')
     .setDescription('🔐 Sends the ticket panel to the designated channel.'),
 
