@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const express = require('express'); // 👈 Added for PORT binding
 require('dotenv').config();
 
 // Initialize Discord Client
@@ -16,7 +17,7 @@ const client = new Client({
 });
 
 // Database configuration — NO API KEY NEEDED
-const DB_URL = process.env.DB_URL || 'https://web-production-c7de2.up.railway.app';
+const DB_URL = (process.env.DB_URL || 'https://web-production-c7de2.up.railway.app').trim(); // 👈 Trim whitespace!
 
 // Database helper functions — NO AUTH HEADER
 const db = {
@@ -257,6 +258,18 @@ async function init() {
 
 // Start the bot
 init();
+
+// 👇 START HTTP SERVER TO BIND TO PORT (REQUIRED FOR HOSTING)
+const app = express();
+const PORT = process.env.PORT || 1000;
+
+app.get('/', (req, res) => {
+  res.status(200).send(`Bot is online! Logged in as: ${client.user?.tag || 'Not ready yet'}`);
+});
+
+app.listen(PORT, () => {
+  console.log(`✅ HTTP Server running on port ${PORT}`);
+});
 
 // Export client and db for use in commands/events
 module.exports = { client, db };
