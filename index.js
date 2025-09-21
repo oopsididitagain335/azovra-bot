@@ -16,11 +16,11 @@ const client = new Client({
   ]
 });
 
-// ✅ FIXED: Trim whitespace from DB_URL
+// ✅ Database URL — trimmed and clean
 const DB_URL = (process.env.DB_URL || 'https://web-production-c7de2.up.railway.app').trim();
 
-// Database helper functions — NO AUTH HEADER
-const db = {
+// ✅ RENAMED TO railwayDB TO AVOID CONFLICTS — THIS IS THE FIX!
+const railwayDB = {
   async set(key, value) {
     try {
       const response = await axios.post(`${DB_URL}/set`, { key, value });
@@ -69,6 +69,9 @@ const db = {
   }
 };
 
+// ✅ DEBUG: Verify railwayDB.get is a function
+console.log('🧪 DEBUG: railwayDB.get exists and is a function:', typeof railwayDB.get === 'function');
+
 // Collections
 client.commands = new Collection();
 client.events = new Collection();
@@ -114,7 +117,8 @@ async function loadEvents() {
     const filePath = path.join(eventsPath, file);
     const event = require(filePath);
 
-    const handler = (...args) => event.execute(...args, client, db);
+    // ✅ Pass railwayDB instead of db
+    const handler = (...args) => event.execute(...args, client, railwayDB);
     if (event.once) {
       client.once(event.name, handler);
     } else {
@@ -137,7 +141,8 @@ async function loadSecurityEvents() {
     const filePath = path.join(securityEventsPath, file);
     const securityEvent = require(filePath);
 
-    const handler = (...args) => securityEvent.execute(...args, client, db);
+    // ✅ Pass railwayDB instead of db
+    const handler = (...args) => securityEvent.execute(...args, client, railwayDB);
     if (securityEvent.once) {
       client.once(securityEvent.name, handler);
     } else {
@@ -172,25 +177,25 @@ async function init() {
     await client.login(process.env.DISCORD_TOKEN);
 
     client.once('ready', async () => {
-      console.log(`Logged in as ${client.user.tag}!`);
+      console.log(`✅ Logged in as ${client.user.tag}!`);
       await registerCommands();
 
       // DB health check every 5 minutes
       setInterval(async () => {
         try {
-          await db.health();
-          console.log('DB Health Check: OK');
+          await railwayDB.health();
+          console.log('✅ DB Health Check: OK');
         } catch (error) {
-          console.error('DB Health Check Failed:', error.message);
+          console.error('❌ DB Health Check Failed:', error.message);
         }
       }, 300000);
 
       // Log DB size
       try {
-        const size = await db.size();
-        console.log(`Database size: ${JSON.stringify(size)}`);
+        const size = await railwayDB.size();
+        console.log(`📊 Database size: ${JSON.stringify(size)}`);
       } catch (error) {
-        console.error('Could not fetch DB size:', error.message);
+        console.error('❌ Could not fetch DB size:', error.message);
       }
     });
 
@@ -200,14 +205,15 @@ async function init() {
 
       const command = client.commands.get(interaction.commandName);
       if (!command) {
-        console.error(`No command matching ${interaction.commandName} was found.`);
+        console.error(`❌ No command matching ${interaction.commandName} was found.`);
         return;
       }
 
       try {
-        await command.execute(interaction, client, db);
+        // ✅ Pass railwayDB
+        await command.execute(interaction, client, railwayDB);
       } catch (error) {
-        console.error(`Error executing ${interaction.commandName}:`, error);
+        console.error(`❌ Error executing ${interaction.commandName}:`, error);
         await interaction.reply({ 
           content: 'There was an error while executing this command!', 
           ephemeral: true 
@@ -216,7 +222,7 @@ async function init() {
     });
 
   } catch (error) {
-    console.error('Bot initialization error:', error);
+    console.error('❌ Bot initialization error:', error);
     process.exit(1);
   }
 }
@@ -236,5 +242,5 @@ app.listen(PORT, () => {
   console.log(`✅ HTTP Server running on port ${PORT}`);
 });
 
-// Export (for potential future use — but avoid importing in events/commands!)
-module.exports = { client, db };
+// Export (safe now)
+module.exports = { client, db: railwayDB };
