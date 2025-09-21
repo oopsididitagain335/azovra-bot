@@ -1,4 +1,3 @@
-// commands/tickets/support.js
 const {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -8,17 +7,15 @@ const {
 const ticketCategories = require('../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder() // ← This line starts with "data:"
+  data: new SlashCommandBuilder() // Assign to 'data' property
     .setName('support')
     .setDescription('🎫 Opens a support ticket with category selection.'),
-
   async execute(interaction, client, db) {
     const embed = new EmbedBuilder()
       .setTitle('🎫 Select Ticket Category')
       .setDescription('Please choose the category that best describes your issue.')
       .setColor('#5865F2')
       .setTimestamp();
-
     const row = new ActionRowBuilder()
       .addComponents(
         new StringSelectMenuBuilder()
@@ -32,7 +29,6 @@ module.exports = {
             }))
           )
       );
-
     await interaction.reply({
       embeds: [embed],
       components: [row],
