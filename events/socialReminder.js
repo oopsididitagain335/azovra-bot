@@ -6,10 +6,10 @@ module.exports = {
   async execute(client, db) {
     console.log('✅ Social reminder system initialized.');
 
-    // YOUR PROVIDED CONFIG — WILL AUTO-SET IN DB
-    const DEFAULT_X_LINK = "https://x.com/theazorva";
-    const ANNOUNCEMENT_CHANNEL_ID = "1416834521327996928"; // Where reminder is sent every 2 hrs
-    const SOCIALS_CHANNEL_ID = "1417169776916168714";      // Mentioned in message
+    // 🔧 CONFIG — WILL AUTO-SET IN DB IF MISSING
+    const DEFAULT_X_LINK = "https://x.com/theazorva"; // ✅ Trimmed whitespace
+    const DEFAULT_ANNOUNCE_CHANNEL_ID = "1416834521327996928"; // Where reminders are sent
+    const DEFAULT_SOCIALS_CHANNEL_ID = "1417169776916168714";   // Mentioned in message
 
     // On ready, pre-configure DB if not already set
     try {
@@ -24,8 +24,15 @@ module.exports = {
         // Set socials channel if not exists
         const currentSocialsChannel = await db.get(`socials_channel_${guild.id}`);
         if (!currentSocialsChannel) {
-          await db.set(`socials_channel_${guild.id}`, SOCIALS_CHANNEL_ID);
-          console.log(`🔑 Set socials channel for ${guild.name}: #${SOCIALS_CHANNEL_ID}`);
+          await db.set(`socials_channel_${guild.id}`, DEFAULT_SOCIALS_CHANNEL_ID);
+          console.log(`🔑 Set socials channel for ${guild.name}: #${DEFAULT_SOCIALS_CHANNEL_ID}`);
+        }
+
+        // Set announcement channel if not exists (optional: if you want per-guild control)
+        const currentAnnounceChannel = await db.get(`announce_channel_${guild.id}`);
+        if (!currentAnnounceChannel) {
+          await db.set(`announce_channel_${guild.id}`, DEFAULT_ANNOUNCE_CHANNEL_ID);
+          console.log(`🔑 Set announcement channel for ${guild.name}: #${DEFAULT_ANNOUNCE_CHANNEL_ID}`);
         }
       }
     } catch (error) {
@@ -36,14 +43,15 @@ module.exports = {
     setInterval(async () => {
       try {
         for (const guild of client.guilds.cache.values()) {
-          // Get configured values
-          const xLink = await db.get(`x_link_${guild.id}`) || DEFAULT_X_LINK;
-          const socialsChannelId = await db.get(`socials_channel_${guild.id}`) || SOCIALS_CHANNEL_ID;
+          // Get configured values (with fallbacks)
+          const xLink = (await db.get(`x_link_${guild.id}`))?.trim() || DEFAULT_X_LINK; // ✅ Trim!
+          const socialsChannelId = await db.get(`socials_channel_${guild.id}`) || DEFAULT_SOCIALS_CHANNEL_ID;
+          const announceChannelId = await db.get(`announce_channel_${guild.id}`) || DEFAULT_ANNOUNCE_CHANNEL_ID;
 
           // Get announcement channel (where message is sent)
-          const announceChannel = guild.channels.cache.get(ANNOUNCEMENT_CHANNEL_ID);
+          const announceChannel = guild.channels.cache.get(announceChannelId);
           if (!announceChannel || !announceChannel.isTextBased()) {
-            console.log(`⚠️  Announcement channel not found or inaccessible in ${guild.name}.`);
+            console.log(`⚠️ Announcement channel (${announceChannelId}) not found or inaccessible in ${guild.name}.`);
             continue;
           }
 
@@ -61,7 +69,7 @@ module.exports = {
 
           // Send message
           await announceChannel.send({ embeds: [embed] });
-          console.log(`✅ Sent social reminder in ${guild.name} (Channel: ${ANNOUNCEMENT_CHANNEL_ID})`);
+          console.log(`✅ Sent social reminder in ${guild.name} → #${announceChannelId}`);
 
         }
       } catch (error) {
