@@ -1,14 +1,13 @@
-// commands/support.js
 const {
   SlashCommandBuilder,
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder
 } = require('discord.js');
-const ticketCategories = require('../config/ticketCategories');
+const ticketCategories = require('../config/ticketCategories.js'); // ✅ Added .js
 
 module.exports = {
-  data: new SlashCommandBuilder() // ✅ "data" property added
+   new SlashCommandBuilder()
     .setName('support')
     .setDescription('🎫 Opens a support ticket with category selection.'),
 
