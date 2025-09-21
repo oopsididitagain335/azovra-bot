@@ -106,26 +106,38 @@ async function loadCommands() {
 async function loadEvents() {
   const eventsPath = path.join(__dirname, 'events');
   if (!fs.existsSync(eventsPath)) {
-    console.log('No events directory found. Skipping event loading.');
+    console.log('❌ No events directory found. Skipping event loading.');
     return;
   }
   const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+  if (eventFiles.length === 0) {
+    console.log('❌ No .js files found in events directory.');
+    return;
+  }
   for (const file of eventFiles) {
     const filePath = path.join(eventsPath, file);
-    const event = require(filePath);
-    const handler = (...args) => {
-      if (!railwayDB || typeof railwayDB.get !== 'function') {
-        console.error(`ERROR: railwayDB is invalid in event ${event.name}:`, railwayDB);
-        return;
+    try {
+      const event = require(filePath);
+      if (!event.name || typeof event.execute !== 'function') {
+        console.log(`[WARNING] Event at ${filePath} is missing required "name" or "execute" property.`);
+        continue;
       }
-      event.execute(...args, client, railwayDB);
-    };
-    if (event.once) {
-      client.once(event.name, handler);
-    } else {
-      client.on(event.name, handler);
+      const handler = (...args) => {
+        if (!railwayDB || typeof railwayDB.get !== 'function') {
+          console.error(`❌ ERROR: railwayDB is invalid in event ${event.name}:`, railwayDB);
+          return;
+        }
+        event.execute(...args, client, railwayDB);
+      };
+      if (event.once) {
+        client.once(event.name, handler);
+      } else {
+        client.on(event.name, handler);
+      }
+      console.log(`✅ Loaded event: ${event.name}`);
+    } catch (error) {
+      console.error(`❌ Error loading event ${file}:`, error);
     }
-    console.log(`Loaded event: ${event.name}`);
   }
 }
 
@@ -139,20 +151,24 @@ async function loadSecurityEvents() {
   const securityEventFiles = fs.readdirSync(securityEventsPath).filter(file => file.endsWith('.js'));
   for (const file of securityEventFiles) {
     const filePath = path.join(securityEventsPath, file);
-    const securityEvent = require(filePath);
-    const handler = (...args) => {
-      if (!railwayDB || typeof railwayDB.get !== 'function') {
-        console.error(`ERROR: railwayDB is invalid in security event ${securityEvent.name}:`, railwayDB);
-        return;
+    try {
+      const securityEvent = require(filePath);
+      const handler = (...args) => {
+        if (!railwayDB || typeof railwayDB.get !== 'function') {
+          console.error(`❌ ERROR: railwayDB is invalid in security event ${securityEvent.name}:`, railwayDB);
+          return;
+        }
+        securityEvent.execute(...args, client, railwayDB);
+      };
+      if (securityEvent.once) {
+        client.once(securityEvent.name, handler);
+      } else {
+        client.on(securityEvent.name, handler);
       }
-      securityEvent.execute(...args, client, railwayDB);
-    };
-    if (securityEvent.once) {
-      client.once(securityEvent.name, handler);
-    } else {
-      client.on(securityEvent.name, handler);
+      console.log(`Loaded security event: ${securityEvent.name}`);
+    } catch (error) {
+      console.error(`❌ Error loading security event ${file}:`, error);
     }
-    console.log(`Loaded security event: ${securityEvent.name}`);
   }
 }
 
@@ -176,7 +192,7 @@ async function init() {
     await loadEvents();
     await loadSecurityEvents();
     await client.login(process.env.DISCORD_TOKEN);
-    client.once('ready', async () => {
+    client.once('clientReady', async () => {
       console.log(`✅ Logged in as ${client.user.tag}!`);
       await registerCommands();
       // DB health check every 5 minutes
