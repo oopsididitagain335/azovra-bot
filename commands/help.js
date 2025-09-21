@@ -67,7 +67,7 @@ module.exports = {
       .setColor('#5865F2')
       .setTitle('📚 Command Help Center')
       .setDescription('Select a category below to view commands in that section.')
-      .setFooter({ text: 'Built with ❤️ for The Azorva' })
+      .setFooter({ text: 'Built with ❤️ for Azorva By Soldev' })
       .setTimestamp();
 
     // Create select menu options
