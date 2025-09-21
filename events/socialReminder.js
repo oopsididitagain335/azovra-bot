@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
-  name: 'ready',
+  name: 'clientReady',
   once: true,
   async execute(client, railwayDB) {
     console.log('✅ Social reminder system initialized.');
