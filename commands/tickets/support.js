@@ -8,7 +8,7 @@ const {
 const ticketCategories = require('../config/ticketCategories');
 
 module.exports = {
-   new SlashCommandBuilder()
+  data: new SlashCommandBuilder() // ✅ "data" property added
     .setName('support')
     .setDescription('🎫 Opens a support ticket with category selection.'),
 
