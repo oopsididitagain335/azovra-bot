@@ -15,16 +15,14 @@ const client = new Client({
   ]
 });
 
-// Database configuration
+// Database configuration — NO API KEY NEEDED
 const DB_URL = process.env.DB_URL || 'https://web-production-c7de2.up.railway.app';
-const DB_API_KEY = process.env.DB_API_KEY;
 
-// Database helper functions
+// Database helper functions — NO AUTH HEADER
 const db = {
   async set(key, value) {
     try {
-      const config = DB_API_KEY ? { headers: { 'X-API-Key': DB_API_KEY } } : {};
-      const response = await axios.post(`${DB_URL}/set`, { key, value }, config);
+      const response = await axios.post(`${DB_URL}/set`, { key, value });
       return response.data;
     } catch (error) {
       console.error('DB Set Error:', error.message);
@@ -34,8 +32,7 @@ const db = {
   
   async get(key) {
     try {
-      const config = DB_API_KEY ? { headers: { 'X-API-Key': DB_API_KEY } } : {};
-      const response = await axios.get(`${DB_URL}/get/${key}`, config);
+      const response = await axios.get(`${DB_URL}/get/${key}`);
       return response.data;
     } catch (error) {
       if (error.response?.status === 404) {
@@ -52,8 +49,7 @@ const db = {
   
   async size() {
     try {
-      const config = DB_API_KEY ? { headers: { 'X-API-Key': DB_API_KEY } } : {};
-      const response = await axios.get(`${DB_URL}/size`, config);
+      const response = await axios.get(`${DB_URL}/size`);
       return response.data;
     } catch (error) {
       console.error('DB Size Error:', error.message);
@@ -63,8 +59,7 @@ const db = {
   
   async health() {
     try {
-      const config = DB_API_KEY ? { headers: { 'X-API-Key': DB_API_KEY } } : {};
-      const response = await axios.get(`${DB_URL}/health`, config);
+      const response = await axios.get(`${DB_URL}/health`);
       return response.data;
     } catch (error) {
       console.error('DB Health Check Error:', error.message);
@@ -183,7 +178,7 @@ async function registerCommands() {
   try {
     console.log(`Started refreshing ${commands.length} application (/) commands.`);
     
-    // Refresh all commands in the guild
+    // Refresh all commands
     const data = await rest.put(
       Routes.applicationCommands(client.user.id),
       { body: commands }
@@ -213,7 +208,7 @@ async function init() {
       // Register slash commands
       await registerCommands();
       
-      // Start health check interval for DB
+      // Start health check interval for DB (for UptimeRobot)
       setInterval(async () => {
         try {
           await db.health();
@@ -223,7 +218,7 @@ async function init() {
         }
       }, 300000); // Every 5 minutes
       
-      // Log DB size periodically
+      // Log DB size on startup
       try {
         const size = await db.size();
         console.log(`Database size: ${JSON.stringify(size)}`);
