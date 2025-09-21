@@ -30,7 +30,6 @@ const railwayDB = {
       throw error;
     }
   },
-
   async get(key) {
     try {
       const response = await axios.get(`${DB_URL}/get/${key}`);
@@ -43,11 +42,9 @@ const railwayDB = {
       throw error;
     }
   },
-
   async delete(key) {
     return await this.set(key, "");
   },
-
   async size() {
     try {
       const response = await axios.get(`${DB_URL}/size`);
@@ -57,7 +54,6 @@ const railwayDB = {
       throw error;
     }
   },
-
   async health() {
     try {
       const response = await axios.get(`${DB_URL}/health`);
@@ -84,20 +80,36 @@ async function loadCommands() {
     console.log('No commands directory found. Skipping command loading.');
     return;
   }
-  const commandFiles = fs.readdirSync(commandsPath).filter(file =>
-    file.endsWith('.js') ||
-    (fs.statSync(path.join(commandsPath, file)).isDirectory() && fs.existsSync(path.join(commandsPath, file, 'index.js')))
-  );
-  for (const file of commandFiles) {
-    let filePath = fs.statSync(path.join(commandsPath, file)).isDirectory()
-      ? path.join(commandsPath, file, 'index.js')
-      : path.join(commandsPath, file);
-    const command = require(filePath);
-    if ('data' in command && 'execute' in command) {
-      client.commands.set(command.data.name, command);
-      console.log(`Loaded command: ${command.data.name}`);
-    } else {
-      console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+
+  // Recursive function to find all .js files in directories and subdirectories
+  function getAllJsFiles(dirPath, files = []) {
+    const items = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const item of items) {
+      const fullPath = path.join(dirPath, item.name);
+      if (item.isDirectory()) {
+        // Recursively get .js files from subdirectory
+        getAllJsFiles(fullPath, files);
+      } else if (item.isFile() && item.name.endsWith('.js')) {
+        files.push(fullPath);
+      }
+    }
+    return files;
+  }
+
+  const commandFiles = getAllJsFiles(commandsPath);
+  for (const filePath of commandFiles) {
+    try {
+      // Clear module cache to ensure fresh reload
+      delete require.cache[require.resolve(filePath)];
+      const command = require(filePath);
+      if ('data' in command && 'execute' in command) {
+        client.commands.set(command.data.name, command);
+        console.log(`Loaded command: ${command.data.name} from ${filePath}`);
+      } else {
+        console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+      }
+    } catch (error) {
+      console.error(`❌ Error loading command at ${filePath}:`, error);
     }
   }
 }
