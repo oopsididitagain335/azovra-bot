@@ -28,7 +28,7 @@ module.exports = {
 };
 
 // ================
-// 🚀 FASTEST TICKET CREATION
+// 🚀 FASTEST TICKET CREATION WITH AUTO-CATEGORY
 // ================
 
 async function handleTicketCreation(interaction, client, db) {
@@ -45,6 +45,65 @@ async function handleTicketCreation(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
+  // =============
+  // 🔧 CREATE "Support Team" ROLE (if missing)
+  // =============
+  let supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
+  if (!supportRole) {
+    try {
+      supportRole = await guild.roles.create({
+        name: 'Support Team',
+        color: '#5865F2',
+        reason: 'Auto-created for ticket system'
+      });
+      console.log(`✅ Created Support Role: ${supportRole.name}`);
+    } catch (error) {
+      console.error('❌ Failed to create Support Role:', error.message);
+      return interaction.followUp({
+        content: '❌ Bot lacks permission to create roles.',
+        ephemeral: true
+      });
+    }
+  }
+
+  // ======================
+  // 🗂️ CREATE "🎟️ Tickets" CATEGORY (if missing)
+  // ======================
+  let ticketCategory = guild.channels.cache.find(
+    ch => ch.type === 4 && ch.name === '🎟️ Tickets'
+  );
+
+  if (!ticketCategory) {
+    try {
+      ticketCategory = await guild.channels.create({
+        name: '🎟️ Tickets',
+        type: 4, // GUILD_CATEGORY
+        permissionOverwrites: [
+          {
+            id: guild.roles.everyone,
+            deny: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: supportRole.id,
+            allow: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: client.user.id,
+            allow: [PermissionFlagsBits.ViewChannel]
+          }
+        ],
+        reason: 'Auto-created for ticket system'
+      });
+      console.log(`✅ Created Ticket Category: ${ticketCategory.name}`);
+    } catch (error) {
+      console.error('❌ Failed to create Ticket Category:', error.message);
+      return interaction.followUp({
+        content: '❌ Bot lacks permission to create categories.',
+        ephemeral: true
+      });
+    }
+  }
+
   // ====================
   // 🎫 CREATE CHANNEL (FASTEST PATH)
   // ====================
@@ -53,7 +112,7 @@ async function handleTicketCreation(interaction, client, db) {
     ticketChannel = await guild.channels.create({
       name: `${categoryConfig.value}-${interaction.user.username}`.substring(0, 99),
       type: 0, // GUILD_TEXT
-      parent: 'YOUR_TICKET_CATEGORY_ID_HERE', // ⚠️ REPLACE THIS
+      parent: ticketCategory.id, // USE AUTO-CREATED CATEGORY
       permissionOverwrites: [
         {
           id: guild.roles.everyone,
@@ -131,7 +190,7 @@ async function handleClaimTicket(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  // Get Support Role (hardcoded)
+  // Get Support Role
   const supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
   if (!supportRole) {
     return interaction.reply({
