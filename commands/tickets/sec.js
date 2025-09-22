@@ -9,7 +9,7 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder() // ← This line was missing "data:"
+  data: new SlashCommandBuilder() // ✅ "data:" was MISSING — this is the fix
     .setName('sec')
     .setDescription('🔐 Send or update the persistent ticket panel.'),
 
