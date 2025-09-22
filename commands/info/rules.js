@@ -6,12 +6,12 @@ module.exports = {
     .setDescription('📜 Shows server guidelines.'),
 
   async execute(interaction, client, db) {
-    // 👇 DEFER FIRST — prevents "Unknown interaction" on slow ops
-    await interaction.deferReply({ ephemeral: false });
+    // 👉 DEFER without "ephemeral" — use flags if needed
+    await interaction.deferReply();
 
     try {
       let rules = await db.get(`server_rules_${interaction.guild.id}`);
-      rules = String(rules || ""); // 👈 SAFEGUARD against non-string
+      rules = String(rules || ""); // Coerce to string to avoid .split() error
 
       if (!rules || rules.trim() === "") {
         rules = `**📜 Server Rules & Guidelines**
@@ -90,13 +90,13 @@ Thank you for helping us maintain a positive, safe, and fun community! 🙏`;
         await db.set(`server_rules_${interaction.guild.id}`, rules);
       }
 
-      // Split into sections (after intro)
+      // Split into sections
       const sections = rules.split(/---\s*\n###/).map(s => s.trim());
       const [intro, ...rest] = sections;
 
       const embeds = [];
 
-      // First embed: Intro + Section 1
+      // First embed
       embeds.push({
         title: '📜 Server Rules & Guidelines',
         description: `**Welcome!** To keep this community safe and enjoyable for everyone, please follow these rules. Violations may result in warnings, mutes, kicks, or bans. Use \`/report\` to notify staff of issues.\n\n${rest[0] ? `### ${rest[0]}` : ''}`,
@@ -115,16 +115,16 @@ Thank you for helping us maintain a positive, safe, and fun community! 🙏`;
         });
       });
 
-      // Send reply (up to 10 embeds)
+      // ✅ Use editReply (no ephemeral needed unless you want it)
       await interaction.editReply({ embeds: embeds.slice(0, 10) });
 
     } catch (error) {
       console.error('Error in /rules:', error);
 
-      // Use editReply since we deferred earlier
+      // ✅ Use flags: 64 instead of ephemeral: true
       await interaction.editReply({
         content: '❌ Could not load rules. Please try again later.',
-        flags: 64 // ephemeral
+        flags: 64 // = ephemeral
       });
     }
   }
