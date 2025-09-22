@@ -9,7 +9,7 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-  data: new SlashCommandBuilder()
+   new SlashCommandBuilder()
     .setName('sec')
     .setDescription('🔐 Send or update the persistent ticket panel.'),
 
