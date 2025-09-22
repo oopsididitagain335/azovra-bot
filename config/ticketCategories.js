@@ -1,4 +1,5 @@
-// config/ticketCategories.js
+// src/config/ticketCategories.js
+
 module.exports = {
   categories: [
     {
