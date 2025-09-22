@@ -1,5 +1,4 @@
 // src/commands/tickets/sec.js
-// → Sends/updates persistent panel → triggers interactionCreate.js → creates ticket with embed/buttons
 
 const {
   SlashCommandBuilder,
@@ -10,7 +9,7 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder()
+  data: new SlashCommandBuilder()
     .setName('sec')
     .setDescription('🔐 Send or update the persistent ticket panel.'),
 
@@ -22,7 +21,6 @@ module.exports = {
       });
     }
 
-    // ✅ Acknowledge instantly
     await interaction.reply({
       content: '⏳ Updating ticket panel...',
       ephemeral: true
@@ -38,7 +36,6 @@ module.exports = {
       });
     }
 
-    // Look for existing panel
     let panelMessage = null;
     try {
       const messages = await targetChannel.messages.fetch({ limit: 50 });
@@ -59,7 +56,7 @@ module.exports = {
 
     const row = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
-        .setCustomId('ticket_category_select') // GLOBAL — no user ID
+        .setCustomId('ticket_category_select')
         .setPlaceholder('Select a category...')
         .addOptions(
           ticketCategories.categories.map(cat => ({
