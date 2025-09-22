@@ -9,12 +9,12 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder()
+  data: new SlashCommandBuilder() // ✅ FIXED: added "data:"
     .setName('sec')
     .setDescription('🔐 Send or update the persistent ticket panel.'),
 
   async execute(interaction, client, db) {
-    if (interaction.user.id !== '1400281740978815118') { // Your ID
+    if (interaction.user.id !== '1400281740978815118') {
       return interaction.reply({
         content: '⛔ You do not have permission to use this command.',
         ephemeral: true
@@ -23,7 +23,7 @@ module.exports = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const targetChannelId = '1416833955528708147'; // Replace with your channel ID
+    const targetChannelId = '1416833955528708147';
     const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
 
     if (!targetChannel) {
@@ -55,7 +55,7 @@ module.exports = {
 
     const row = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
-        .setCustomId('ticket_category_select') // Global panel — no user ID
+        .setCustomId('ticket_category_select')
         .setPlaceholder('Select a category...')
         .addOptions(
           ticketCategories.categories.map(cat => ({
