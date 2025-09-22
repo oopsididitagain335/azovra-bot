@@ -6,31 +6,41 @@ module.exports = {
       label: 'General Support',
       value: 'general-support',
       description: 'Any reports, general inquiries or questions.',
-      categoryName: '🎫・General Support'
+      categoryName: '🎫・general-support',
+      emoji: '🎫',
+      supportOnly: true // Support role can respond
     },
     {
       label: 'Role Request',
       value: 'role-request',
-      description: 'Request a Role',
-      categoryName: '🎫・Role Requests'
+      description: 'Request a role or tag.',
+      categoryName: '🎫・role-requests',
+      emoji: '🏷️',
+      supportOnly: true
     },
     {
       label: 'Org Role Creation',
       value: 'org-role-creation',
       description: 'Create a role for your organization/business.',
-      categoryName: '🎫・Org Roles'
+      categoryName: '🎫・org-roles',
+      emoji: '🏢',
+      supportOnly: true
     },
     {
       label: 'Contact Owners',
       value: 'contact-owners',
-      description: 'Important Matters, Investments or Collaborations / Sponsors.',
-      categoryName: '🎫・Owner Contact'
+      description: 'Important matters, investments, or sponsorships.',
+      categoryName: '🔐・owner-contact',
+      emoji: '👑',
+      adminOnly: true // Only Admins can respond
     },
     {
       label: 'Staff Application',
       value: 'staff-application',
-      description: 'Applying for staff or management.',
-      categoryName: '🎫・Staff Applications'
+      description: 'Apply for staff or management positions.',
+      categoryName: '🎫・staff-apps',
+      emoji: '💼',
+      supportOnly: true
     }
   ]
 };
