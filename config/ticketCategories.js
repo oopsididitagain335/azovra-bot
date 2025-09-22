@@ -8,7 +8,7 @@ module.exports = {
       description: 'Any reports, general inquiries or questions.',
       categoryName: '🎫・general-support',
       emoji: '🎫',
-      supportOnly: true // Support role can respond
+      supportOnly: true
     },
     {
       label: 'Role Request',
@@ -32,7 +32,7 @@ module.exports = {
       description: 'Important matters, investments, or sponsorships.',
       categoryName: '🔐・owner-contact',
       emoji: '👑',
-      adminOnly: true // Only Admins can respond
+      adminOnly: true
     },
     {
       label: 'Staff Application',
