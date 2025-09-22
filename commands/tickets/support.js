@@ -6,16 +6,20 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder
 } = require('discord.js');
-const ticketCategories = require('../../config/ticketCategories.js'); // ✅ Fixed path: was '../' — should be '../../'
+const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-  data: new SlashCommandBuilder()
+   new SlashCommandBuilder()
     .setName('support')
-    .setDescription('🎫 Opens a support ticket with category selection.'),
+    .setDescription('🎫 Open a support ticket with category selection.'),
+
   async execute(interaction, client, db) {
+    // Defer to avoid interaction timeout
+    await interaction.deferReply({ ephemeral: true });
+
     const embed = new EmbedBuilder()
       .setTitle('🎫 Select Ticket Category')
-      .setDescription('Please choose the category that best describes your issue.')
+      .setDescription('Choose the category that best fits your request.\nYou can create ANY ticket — response permissions vary.')
       .setColor('#5865F2')
       .setTimestamp();
 
@@ -27,12 +31,13 @@ module.exports = {
           ticketCategories.categories.map(cat => ({
             label: cat.label,
             value: cat.value,
-            description: cat.description
+            description: cat.description,
+            emoji: { name: cat.emoji }
           }))
         )
     );
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
       components: [row],
       ephemeral: true
