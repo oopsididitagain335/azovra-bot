@@ -1,4 +1,5 @@
 // src/commands/tickets/support.js
+// → Shows ephemeral panel → triggers interactionCreate.js → creates ticket with embed/buttons
 
 const {
   SlashCommandBuilder,
@@ -9,23 +10,21 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-  data: new SlashCommandBuilder() // ✅ "data:" was MISSING — this is the fix
+   new SlashCommandBuilder()
     .setName('support')
     .setDescription('🎫 Open a support ticket with category selection.'),
 
   async execute(interaction, client, db) {
     try {
-      await interaction.deferReply({ ephemeral: true });
-
       const embed = new EmbedBuilder()
         .setTitle('🎫 Select Ticket Category')
-        .setDescription('Choose the category that best fits your request.\n✅ **Everyone can create ANY ticket** — response permissions vary by type.')
+        .setDescription('Choose a category below. Anyone can create any ticket — response access varies.')
         .setColor('#5865F2')
         .setTimestamp();
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
-          .setCustomId(`ticket_category_select_${interaction.user.id}`)
+          .setCustomId(`ticket_category_select_${interaction.user.id}`) // User-specific to avoid conflicts
           .setPlaceholder('Select a category...')
           .addOptions(
             ticketCategories.categories.map(cat => ({
@@ -37,16 +36,18 @@ module.exports = {
           )
       );
 
-      await interaction.editReply({
+      // ✅ INSTANT — no defer, no loading
+      await interaction.reply({
         embeds: [embed],
         components: [row],
         ephemeral: true
       });
+
     } catch (error) {
       console.error('Error in /support:', error);
-      if (!interaction.replied && !interaction.deferred) {
+      if (!interaction.replied) {
         await interaction.reply({
-          content: '❌ An error occurred while opening the panel.',
+          content: '❌ Could not open panel. Try again later.',
           ephemeral: true
         });
       }
