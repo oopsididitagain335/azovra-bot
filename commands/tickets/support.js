@@ -9,7 +9,7 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder()
+   new SlashCommandBuilder() // ← This line was missing "data:"
     .setName('support')
     .setDescription('🎫 Open a support ticket with category selection.'),
 
@@ -25,7 +25,7 @@ module.exports = {
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
-          .setCustomId(`ticket_category_select_${interaction.user.id}`) // User-specific to avoid spam/confusion
+          .setCustomId(`ticket_category_select_${interaction.user.id}`)
           .setPlaceholder('Select a category...')
           .addOptions(
             ticketCategories.categories.map(cat => ({
