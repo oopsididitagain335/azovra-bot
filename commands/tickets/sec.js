@@ -1,4 +1,5 @@
 // src/commands/tickets/sec.js
+// → Sends/updates persistent panel → triggers interactionCreate.js → creates ticket with embed/buttons
 
 const {
   SlashCommandBuilder,
@@ -9,7 +10,7 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-  data: new SlashCommandBuilder() // ✅ "data:" was MISSING — this is the fix
+   new SlashCommandBuilder()
     .setName('sec')
     .setDescription('🔐 Send or update the persistent ticket panel.'),
 
@@ -21,7 +22,11 @@ module.exports = {
       });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    // ✅ Acknowledge instantly
+    await interaction.reply({
+      content: '⏳ Updating ticket panel...',
+      ephemeral: true
+    });
 
     const targetChannelId = '1416833955528708147';
     const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
@@ -33,6 +38,7 @@ module.exports = {
       });
     }
 
+    // Look for existing panel
     let panelMessage = null;
     try {
       const messages = await targetChannel.messages.fetch({ limit: 50 });
@@ -46,14 +52,14 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setTitle('🎫 Open a Support Ticket')
-      .setDescription('✅ **Anyone can create any ticket** — just select below!\nResponse access depends on ticket type.')
+      .setDescription('✅ Anyone can create any ticket — just select below!\nResponse access depends on ticket type.')
       .setColor('#5865F2')
       .setFooter({ text: 'Support Team' })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
-        .setCustomId('ticket_category_select')
+        .setCustomId('ticket_category_select') // GLOBAL — no user ID
         .setPlaceholder('Select a category...')
         .addOptions(
           ticketCategories.categories.map(cat => ({
