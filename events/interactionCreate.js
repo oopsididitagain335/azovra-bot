@@ -28,7 +28,7 @@ module.exports = {
 };
 
 // ================
-// 🚀 TICKET CREATION — OPTIMIZED FOR SPEED
+// 🚀 FASTEST TICKET CREATION
 // ================
 
 async function handleTicketCreation(interaction, client, db) {
@@ -39,80 +39,21 @@ async function handleTicketCreation(interaction, client, db) {
     return interaction.reply({ content: '❌ Invalid category.', ephemeral: true });
   }
 
-  // Immediately acknowledge without blocking
+  // ACKNOWLEDGE IMMEDIATELY
   await interaction.deferUpdate();
 
   const guild = interaction.guild;
   if (!guild) return;
 
-  // =============
-  // 🔧 CREATE "Support Team" ROLE (if missing)
-  // =============
-  let supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
-  if (!supportRole) {
-    try {
-      supportRole = await guild.roles.create({
-        name: 'Support Team',
-        color: '#5865F2',
-        reason: 'Auto-created for ticket system'
-      });
-      console.log(`✅ Created Support Role: ${supportRole.name} (${supportRole.id})`);
-    } catch (error) {
-      console.error('❌ Failed to create Support Role:', error.message);
-      return interaction.followUp({
-        content: '❌ Bot lacks permission to create roles. Contact server owner.',
-        ephemeral: true
-      });
-    }
-  }
-
-  // ======================
-  // 🗂️ CREATE "🎟️ Tickets" CATEGORY (if missing)
-  // ======================
-  let ticketCategory = guild.channels.cache.find(
-    ch => ch.type === 4 && ch.name === '🎟️ Tickets'
-  );
-
-  if (!ticketCategory) {
-    try {
-      ticketCategory = await guild.channels.create({
-        name: '🎟️ Tickets',
-        type: 4, // GUILD_CATEGORY
-        permissionOverwrites: [
-          {
-            id: guild.roles.everyone,
-            deny: [PermissionFlagsBits.ViewChannel]
-          },
-          {
-            id: supportRole.id,
-            allow: [PermissionFlagsBits.ViewChannel]
-          },
-          {
-            id: client.user.id,
-            allow: [PermissionFlagsBits.ViewChannel]
-          }
-        ],
-        reason: 'Auto-created for ticket system'
-      });
-      console.log(`✅ Created Ticket Category: ${ticketCategory.name} (${ticketCategory.id})`);
-    } catch (error) {
-      console.error('❌ Failed to create Ticket Category:', error.message);
-      return interaction.followUp({
-        content: '❌ Bot lacks permission to create categories. Contact server owner.',
-        ephemeral: true
-      });
-    }
-  }
-
   // ====================
-  // 🎫 CREATE TICKET CHANNEL — MINIMAL AWAIT, MAX SPEED
+  // 🎫 CREATE CHANNEL (FASTEST PATH)
   // ====================
   let ticketChannel;
   try {
     ticketChannel = await guild.channels.create({
       name: `${categoryConfig.value}-${interaction.user.username}`.substring(0, 99),
       type: 0, // GUILD_TEXT
-      parent: ticketCategory.id,
+      parent: 'YOUR_TICKET_CATEGORY_ID_HERE', // ⚠️ REPLACE THIS
       permissionOverwrites: [
         {
           id: guild.roles.everyone,
@@ -127,40 +68,19 @@ async function handleTicketCreation(interaction, client, db) {
           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
         }
       ],
-      topic: `Ticket for ${interaction.user.tag} | Category: ${categoryConfig.label} | Owner: ${interaction.user.id}`,
+      topic: `Ticket for ${interaction.user.tag} | Category: ${categoryConfig.label}`,
       reason: `Ticket created by ${interaction.user.tag}`
     });
-
-    // Grant Support Role (unless adminOnly)
-    if (!categoryConfig.adminOnly) {
-      await ticketChannel.permissionOverwrites.create(supportRole, {
-        ViewChannel: true,
-        SendMessages: true,
-        ReadMessageHistory: true
-      });
-    }
-
-    // Grant ALL ADMINS
-    const admins = await guild.members.fetch({ force: true });
-    const adminMembers = admins.filter(m => m.permissions.has(PermissionFlagsBits.Administrator));
-    for (const [id, adminMember] of adminMembers) {
-      await ticketChannel.permissionOverwrites.create(adminMember, {
-        ViewChannel: true,
-        SendMessages: true,
-        ReadMessageHistory: true
-      });
-    }
-
   } catch (error) {
     console.error('❌ Channel creation failed:', error);
     return interaction.followUp({
-      content: '❌ Failed to create ticket channel. Please contact an admin.',
+      content: '❌ Failed to create ticket channel.',
       ephemeral: true
     });
   }
 
   // ======================
-  // 🚨 SEND EMBED + BUTTONS — IMMEDIATELY (NO EXTRA AWAIT BEFORE THIS)
+  // 🚨 SEND EMBED + BUTTONS — INSTANT
   // ======================
 
   const welcomeEmbed = new EmbedBuilder()
@@ -187,14 +107,14 @@ async function handleTicketCreation(interaction, client, db) {
       .setEmoji('🔒')
   );
 
-  // ⚡ THIS IS THE FASTEST POSSIBLE SEND — no blocking before this point except essential setup
+  // ⚡ FIRE IMMEDIATELY — NO DELAYS
   ticketChannel.send({
-    content: categoryConfig.adminOnly ? '@here' : `@here ${supportRole}`,
+    content: categoryConfig.adminOnly ? '@here' : `@here`,
     embeds: [welcomeEmbed],
     components: [row]
-  }).catch(console.error); // Fire and forget — don’t await if you want max speed
+  }).catch(err => console.error('Failed to send ticket message:', err));
 
-  // Notify user
+  // NOTIFY USER
   await interaction.followUp({
     content: `✅ Your ticket has been created: ${ticketChannel} — please check there.`,
     ephemeral: true
@@ -204,18 +124,18 @@ async function handleTicketCreation(interaction, client, db) {
 }
 
 // ================
-// 🔐 CLAIM TICKET — STAFF ONLY (Support Role or Admin)
+// 🔐 CLAIM TICKET — STAFF ONLY
 // ================
 
 async function handleClaimTicket(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  // Get Support Role
+  // Get Support Role (hardcoded)
   const supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
   if (!supportRole) {
     return interaction.reply({
-      content: '❌ Support role not found. Contact server owner.',
+      content: '❌ Support role not found.',
       ephemeral: true
     });
   }
@@ -225,7 +145,7 @@ async function handleClaimTicket(interaction, client, db) {
 
   if (!isSupport && !isAdmin) {
     return interaction.reply({
-      content: '⛔ Only Support Team members or Admins can claim tickets.',
+      content: '⛔ Only Support Team or Admins can claim tickets.',
       ephemeral: true
     });
   }
@@ -255,12 +175,10 @@ async function handleClaimTicket(interaction, client, db) {
 }
 
 // ================
-// 🚪 CLOSE TICKET — ANYONE CAN CLOSE
+// 🚪 CLOSE TICKET — ANYONE
 // ================
 
 async function handleCloseTicket(interaction, client, db) {
-  // ⚠️ NO PERMISSION CHECK — anyone can close
-
   await interaction.deferUpdate();
 
   const channelId = interaction.customId.split('_')[2];
@@ -273,9 +191,7 @@ async function handleCloseTicket(interaction, client, db) {
     });
   }
 
-  // Optional: Generate transcript here if needed (not blocking)
-
-  await channel.delete('Ticket closed by user request').catch(console.error);
+  await channel.delete('Ticket closed by user request').catch(() => {});
 
   await interaction.followUp({
     content: `✅ Ticket #${channel.name} has been closed by ${interaction.user.tag}.`,
