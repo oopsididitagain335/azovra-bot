@@ -6,15 +6,15 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder
 } = require('discord.js');
-const ticketCategories = require('../../config/ticketCategories.js'); // ✅ Fixed path
+const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-  data: new SlashCommandBuilder()
+   new SlashCommandBuilder()
     .setName('sec')
-    .setDescription('🔐 Sends the ticket panel to the designated channel.'),
+    .setDescription('🔐 Send or update the persistent ticket panel.'),
+
   async execute(interaction, client, db) {
-    // Only allow specific user
-    if (interaction.user.id !== '1400281740978815118') {
+    if (interaction.user.id !== '1400281740978815118') { // Your ID
       return interaction.reply({
         content: '⛔ You do not have permission to use this command.',
         ephemeral: true
@@ -23,7 +23,7 @@ module.exports = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const targetChannelId = '1416833955528708147';
+    const targetChannelId = '1416833955528708147'; // Replace with your channel ID
     const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
 
     if (!targetChannel) {
@@ -33,9 +33,22 @@ module.exports = {
       });
     }
 
+    // Look for existing panel message
+    let panelMessage = null;
+    try {
+      const messages = await targetChannel.messages.fetch({ limit: 50 });
+      const existing = messages.find(msg =>
+        msg.author.id === client.user.id &&
+        msg.embeds?.[0]?.title?.includes('Open a Support Ticket')
+      );
+      panelMessage = existing;
+    } catch (error) {
+      console.error('Error searching for panel:', error);
+    }
+
     const embed = new EmbedBuilder()
       .setTitle('🎫 Open a Support Ticket')
-      .setDescription('Select the category that best fits your issue.\nA private ticket channel will be created for you.')
+      .setDescription('Select the category below.\n**Everyone can create any ticket** — response permissions vary by type.')
       .setColor('#5865F2')
       .setFooter({ text: 'Support Team' })
       .setTimestamp();
@@ -48,16 +61,32 @@ module.exports = {
           ticketCategories.categories.map(cat => ({
             label: cat.label,
             value: cat.value,
-            description: cat.description
+            description: cat.description,
+            emoji: { name: cat.emoji }
           }))
         )
     );
 
-    await targetChannel.send({ embeds: [embed], components: [row] });
-
-    await interaction.editReply({
-      content: `✅ Ticket panel sent to <#${targetChannelId}>`,
-      ephemeral: true
-    });
+    try {
+      if (panelMessage) {
+        await panelMessage.edit({ embeds: [embed], components: [row] });
+        await interaction.editReply({
+          content: `✅ Updated existing ticket panel in <#${targetChannelId}>`,
+          ephemeral: true
+        });
+      } else {
+        await targetChannel.send({ embeds: [embed], components: [row] });
+        await interaction.editReply({
+          content: `✅ Sent new ticket panel to <#${targetChannelId}>`,
+          ephemeral: true
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send/update panel:', error);
+      await interaction.editReply({
+        content: '❌ Failed to send or update panel. Check permissions.',
+        ephemeral: true
+      });
+    }
   }
 };
