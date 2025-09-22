@@ -9,8 +9,8 @@ module.exports = {
     try {
       let rules = await db.get(`server_rules_${interaction.guild.id}`);
 
-if (!rules) {
-  rules = `**📜 Server Rules & Guidelines**
+      if (!rules) {
+        rules = `**📜 Server Rules & Guidelines**
 
 Welcome! To keep this community safe and enjoyable for everyone, please follow these rules. Violations may result in warnings, mutes, kicks, or bans. Use \`/report\` to notify staff of issues.
 
@@ -82,13 +82,38 @@ Furthermore, **do not post or share content that is**:
 ---
 
 Thank you for helping us maintain a positive, safe, and fun community! 🙏`;
-  
-  await db.set(`server_rules_${interaction.guild.id}`, rules);
-}
-      await interaction.reply({
-        content: rules,
-        ephemeral: false
+
+        await db.set(`server_rules_${interaction.guild.id}`, rules);
+      }
+
+      // Split rules by section headers (---\n###)
+      const sections = rules.split(/---\s*\n###/).map(s => s.trim());
+      const [intro, ...rest] = sections;
+
+      // Create embeds
+      const embeds = [];
+
+      // First embed: Intro + Section 1
+      embeds.push({
+        title: '📜 Server Rules & Guidelines',
+        description: `**Welcome!** To keep this community safe and enjoyable for everyone, please follow these rules. Violations may result in warnings, mutes, kicks, or bans. Use \`/report\` to notify staff of issues.\n\n${rest[0] ? `### ${rest[0]}` : ''}`,
+        color: 0x5865F2,
+        footer: { text: 'Page 1/8 — Use /report for issues' }
       });
+
+      // Remaining sections (2-8)
+      rest.slice(1).forEach((section, i) => {
+        const pageNum = i + 2;
+        embeds.push({
+          title: `📜 Section ${pageNum}/8`,
+          description: `### ${section}`,
+          color: 0x5865F2,
+          footer: { text: `Page ${pageNum}/8` }
+        });
+      });
+
+      // Reply with up to 10 embeds (Discord limit)
+      await interaction.reply({ embeds: embeds.slice(0, 10), ephemeral: false });
 
     } catch (error) {
       console.error('Error in /rules:', error);
