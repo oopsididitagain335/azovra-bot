@@ -1,5 +1,4 @@
 // src/commands/tickets/support.js
-// → Shows ephemeral panel → triggers interactionCreate.js → creates ticket with embed/buttons
 
 const {
   SlashCommandBuilder,
@@ -10,7 +9,7 @@ const {
 const ticketCategories = require('../../config/ticketCategories.js');
 
 module.exports = {
-   new SlashCommandBuilder()
+  data: new SlashCommandBuilder()
     .setName('support')
     .setDescription('🎫 Open a support ticket with category selection.'),
 
@@ -24,7 +23,7 @@ module.exports = {
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
-          .setCustomId(`ticket_category_select_${interaction.user.id}`) // User-specific to avoid conflicts
+          .setCustomId(`ticket_category_select_${interaction.user.id}`)
           .setPlaceholder('Select a category...')
           .addOptions(
             ticketCategories.categories.map(cat => ({
@@ -36,7 +35,6 @@ module.exports = {
           )
       );
 
-      // ✅ INSTANT — no defer, no loading
       await interaction.reply({
         embeds: [embed],
         components: [row],
