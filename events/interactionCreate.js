@@ -17,7 +17,6 @@ module.exports = {
       await handleTicketCreation(interaction, client, db);
     }
 
-    // Handle Close & Claim Buttons
     if (interaction.isButton()) {
       if (interaction.customId.startsWith('ticket_close')) {
         await handleCloseTicket(interaction, client, db);
@@ -29,7 +28,7 @@ module.exports = {
 };
 
 // ================
-// TICKET CREATION
+// 🚀 TICKET CREATION — OPTIMIZED FOR SPEED
 // ================
 
 async function handleTicketCreation(interaction, client, db) {
@@ -40,13 +39,14 @@ async function handleTicketCreation(interaction, client, db) {
     return interaction.reply({ content: '❌ Invalid category.', ephemeral: true });
   }
 
-  await interaction.deferUpdate(); // Acknowledge without reply
+  // Immediately acknowledge without blocking
+  await interaction.deferUpdate();
 
   const guild = interaction.guild;
   if (!guild) return;
 
   // =============
-  // CREATE ROLE: "Support Team" (if missing)
+  // 🔧 CREATE "Support Team" ROLE (if missing)
   // =============
   let supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
   if (!supportRole) {
@@ -67,7 +67,7 @@ async function handleTicketCreation(interaction, client, db) {
   }
 
   // ======================
-  // CREATE CATEGORY: "🎟️ Tickets" (if missing)
+  // 🗂️ CREATE "🎟️ Tickets" CATEGORY (if missing)
   // ======================
   let ticketCategory = guild.channels.cache.find(
     ch => ch.type === 4 && ch.name === '🎟️ Tickets'
@@ -105,10 +105,11 @@ async function handleTicketCreation(interaction, client, db) {
   }
 
   // ====================
-  // CREATE TICKET CHANNEL
+  // 🎫 CREATE TICKET CHANNEL — MINIMAL AWAIT, MAX SPEED
   // ====================
+  let ticketChannel;
   try {
-    const ticketChannel = await guild.channels.create({
+    ticketChannel = await guild.channels.create({
       name: `${categoryConfig.value}-${interaction.user.username}`.substring(0, 99),
       type: 0, // GUILD_TEXT
       parent: ticketCategory.id,
@@ -142,7 +143,6 @@ async function handleTicketCreation(interaction, client, db) {
     // Grant ALL ADMINS
     const admins = await guild.members.fetch({ force: true });
     const adminMembers = admins.filter(m => m.permissions.has(PermissionFlagsBits.Administrator));
-
     for (const [id, adminMember] of adminMembers) {
       await ticketChannel.permissionOverwrites.create(adminMember, {
         ViewChannel: true,
@@ -151,107 +151,85 @@ async function handleTicketCreation(interaction, client, db) {
       });
     }
 
-    // ======================
-    // SEND EMBED + BUTTONS — IMMEDIATELY
-    // ======================
-
-    const welcomeEmbed = new EmbedBuilder()
-      .setTitle(`🎫 ${categoryConfig.label} Ticket`)
-      .setDescription(
-        `**User:** ${interaction.user}\n` +
-        `**Category:** ${categoryConfig.label}\n\n` +
-        `> A team member will assist you shortly. Use buttons below to manage this ticket.`
-      )
-      .setColor(categoryConfig.adminOnly ? '#FF5555' : '#5865F2')
-      .setTimestamp()
-      .setFooter({ text: 'Thank you for your patience!' });
-
-    // Buttons: Claim + Close
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`ticket_claim_${ticketChannel.id}`)
-        .setLabel('_claim')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('🙋‍♂️'),
-      new ButtonBuilder()
-        .setCustomId(`ticket_close_${ticketChannel.id}`)
-        .setLabel('Close Ticket')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('🔒')
-    );
-
-    await ticketChannel.send({
-      content: categoryConfig.adminOnly ? '@here' : `${supportRole}`,
-      embeds: [welcomeEmbed],
-      components: [row]
-    });
-
-    // Notify user
-    await interaction.followUp({
-      content: `✅ Your ticket has been created: ${ticketChannel} — please check there.`,
-      ephemeral: true
-    });
-
-    console.log(`🎟️ Ticket created: #${ticketChannel.name} by ${interaction.user.tag}`);
-
   } catch (error) {
-    console.error('❌ Ticket creation failed:', error);
-    await interaction.followUp({
-      content: '❌ Failed to create ticket. Please contact an admin.',
-      ephemeral: true
-    });
-  }
-}
-
-// ================
-// CLOSE TICKET
-// ================
-
-async function handleCloseTicket(interaction, client, db) {
-  if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-    return interaction.reply({
-      content: '⛔ You need **Manage Channels** permission to close tickets.',
-      ephemeral: true
-    });
-  }
-
-  await interaction.deferUpdate();
-
-  const channelId = interaction.customId.split('_')[2];
-  const channel = await client.channels.fetch(channelId).catch(() => null);
-
-  if (!channel) {
+    console.error('❌ Channel creation failed:', error);
     return interaction.followUp({
-      content: '❌ Ticket channel not found.',
+      content: '❌ Failed to create ticket channel. Please contact an admin.',
       ephemeral: true
     });
   }
 
-  const transcript = [];
-  try {
-    const messages = await channel.messages.fetch({ limit: 100 });
-    messages.reverse().forEach(msg => {
-      transcript.push(`[${msg.createdAt.toLocaleString()}] ${msg.author.tag}: ${msg.content}`);
-    });
-  } catch (err) {
-    console.warn('Could not generate transcript:', err.message);
-  }
+  // ======================
+  // 🚨 SEND EMBED + BUTTONS — IMMEDIATELY (NO EXTRA AWAIT BEFORE THIS)
+  // ======================
 
-  // Optional: Save transcript to file or DB here
+  const welcomeEmbed = new EmbedBuilder()
+    .setTitle(`🎫 ${categoryConfig.label} Ticket`)
+    .setDescription(
+      `**User:** ${interaction.user}\n` +
+      `**Category:** ${categoryConfig.label}\n\n` +
+      `> A team member will assist you shortly. Use buttons below to manage this ticket.`
+    )
+    .setColor(categoryConfig.adminOnly ? '#FF5555' : '#5865F2')
+    .setTimestamp()
+    .setFooter({ text: 'Thank you for your patience!' });
 
-  await channel.delete('Ticket closed by user request');
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`ticket_claim_${ticketChannel.id}`)
+      .setLabel('Claim Ticket')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('🙋‍♂️'),
+    new ButtonBuilder()
+      .setCustomId(`ticket_close_${ticketChannel.id}`)
+      .setLabel('Close Ticket')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('🔒')
+  );
 
+  // ⚡ THIS IS THE FASTEST POSSIBLE SEND — no blocking before this point except essential setup
+  ticketChannel.send({
+    content: categoryConfig.adminOnly ? '@here' : `@here ${supportRole}`,
+    embeds: [welcomeEmbed],
+    components: [row]
+  }).catch(console.error); // Fire and forget — don’t await if you want max speed
+
+  // Notify user
   await interaction.followUp({
-    content: `✅ Ticket #${channel.name} has been closed by ${interaction.user.tag}.`,
+    content: `✅ Your ticket has been created: ${ticketChannel} — please check there.`,
     ephemeral: true
   });
+
+  console.log(`🎟️ Ticket created: #${ticketChannel.name} by ${interaction.user.tag}`);
 }
 
 // ================
-// CLAIM TICKET
+// 🔐 CLAIM TICKET — STAFF ONLY (Support Role or Admin)
 // ================
 
 async function handleClaimTicket(interaction, client, db) {
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  // Get Support Role
+  const supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
+  if (!supportRole) {
+    return interaction.reply({
+      content: '❌ Support role not found. Contact server owner.',
+      ephemeral: true
+    });
+  }
+
+  const isSupport = interaction.member.roles.cache.has(supportRole.id);
+  const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+  if (!isSupport && !isAdmin) {
+    return interaction.reply({
+      content: '⛔ Only Support Team members or Admins can claim tickets.',
+      ephemeral: true
+    });
+  }
+
   await interaction.deferUpdate();
 
   const channelId = interaction.customId.split('_')[2];
@@ -264,14 +242,43 @@ async function handleClaimTicket(interaction, client, db) {
     });
   }
 
-  // Edit channel topic to show claimed status
+  // Update topic to show claimed
   const currentTopic = channel.topic || '';
   if (!currentTopic.includes('| Claimed by:')) {
-    await channel.setTopic(`${currentTopic} | Claimed by: ${interaction.user.tag}`);
+    await channel.setTopic(`${currentTopic} | Claimed by: ${interaction.user.tag}`).catch(() => {});
   }
 
   await interaction.followUp({
     content: `🙋‍♂️ ${interaction.user} has claimed this ticket.`,
-    ephemeral: false // Let everyone in ticket see who claimed it
+    ephemeral: false
+  });
+}
+
+// ================
+// 🚪 CLOSE TICKET — ANYONE CAN CLOSE
+// ================
+
+async function handleCloseTicket(interaction, client, db) {
+  // ⚠️ NO PERMISSION CHECK — anyone can close
+
+  await interaction.deferUpdate();
+
+  const channelId = interaction.customId.split('_')[2];
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+
+  if (!channel) {
+    return interaction.followUp({
+      content: '❌ Ticket channel not found.',
+      ephemeral: true
+    });
+  }
+
+  // Optional: Generate transcript here if needed (not blocking)
+
+  await channel.delete('Ticket closed by user request').catch(console.error);
+
+  await interaction.followUp({
+    content: `✅ Ticket #${channel.name} has been closed by ${interaction.user.tag}.`,
+    ephemeral: true
   });
 }
