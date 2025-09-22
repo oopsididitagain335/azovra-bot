@@ -3,85 +3,135 @@
 const {
   Events,
   EmbedBuilder,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 const ticketCategories = require('../config/ticketCategories.js');
 
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction, client, db) {
-    // Handle ticket category selection from ANY panel
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('ticket_category_select')) {
       await handleTicketCreation(interaction, client, db);
+    }
+
+    // Handle Close & Claim Buttons
+    if (interaction.isButton()) {
+      if (interaction.customId.startsWith('ticket_close')) {
+        await handleCloseTicket(interaction, client, db);
+      } else if (interaction.customId.startsWith('ticket_claim')) {
+        await handleClaimTicket(interaction, client, db);
+      }
     }
   }
 };
 
+// ================
+// TICKET CREATION
+// ================
+
 async function handleTicketCreation(interaction, client, db) {
-  // ✅ DO NOT BLOCK BASED ON USER ID — allow anyone to use any panel
-  // We only care about the selected value
-
   const categoryId = interaction.values[0];
-  const category = ticketCategories.categories.find(c => c.value === categoryId);
+  const categoryConfig = ticketCategories.categories.find(c => c.value === categoryId);
 
-  if (!category) {
-    return interaction.reply({
-      content: '❌ Invalid category. Please try again.',
-      ephemeral: true
-    });
+  if (!categoryConfig) {
+    return interaction.reply({ content: '❌ Invalid category.', ephemeral: true });
   }
 
-  // Acknowledge interaction without visible reply
-  await interaction.deferUpdate();
+  await interaction.deferUpdate(); // Acknowledge without reply
 
   const guild = interaction.guild;
+  if (!guild) return;
 
-  // Fetch member (in case not cached)
-  const member = await guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!member) {
-    return interaction.followUp({
-      content: '❌ Could not load your member data. Try again later.',
-      ephemeral: true
-    });
+  // =============
+  // CREATE ROLE: "Support Team" (if missing)
+  // =============
+  let supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
+  if (!supportRole) {
+    try {
+      supportRole = await guild.roles.create({
+        name: 'Support Team',
+        color: '#5865F2',
+        reason: 'Auto-created for ticket system'
+      });
+      console.log(`✅ Created Support Role: ${supportRole.name} (${supportRole.id})`);
+    } catch (error) {
+      console.error('❌ Failed to create Support Role:', error.message);
+      return interaction.followUp({
+        content: '❌ Bot lacks permission to create roles. Contact server owner.',
+        ephemeral: true
+      });
+    }
   }
 
-  // Get Support Role — REPLACE WITH YOUR ACTUAL ROLE ID
-  const SUPPORT_ROLE_ID = 'YOUR_SUPPORT_ROLE_ID_HERE'; // ⚠️ SET THIS
-  const supportRole = guild.roles.cache.get(SUPPORT_ROLE_ID);
+  // ======================
+  // CREATE CATEGORY: "🎟️ Tickets" (if missing)
+  // ======================
+  let ticketCategory = guild.channels.cache.find(
+    ch => ch.type === 4 && ch.name === '🎟️ Tickets'
+  );
 
-  if (category.supportOnly && !supportRole) {
-    console.warn('⚠️ Support role not found. Proceeding without granting support access.');
+  if (!ticketCategory) {
+    try {
+      ticketCategory = await guild.channels.create({
+        name: '🎟️ Tickets',
+        type: 4, // GUILD_CATEGORY
+        permissionOverwrites: [
+          {
+            id: guild.roles.everyone,
+            deny: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: supportRole.id,
+            allow: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: client.user.id,
+            allow: [PermissionFlagsBits.ViewChannel]
+          }
+        ],
+        reason: 'Auto-created for ticket system'
+      });
+      console.log(`✅ Created Ticket Category: ${ticketCategory.name} (${ticketCategory.id})`);
+    } catch (error) {
+      console.error('❌ Failed to create Ticket Category:', error.message);
+      return interaction.followUp({
+        content: '❌ Bot lacks permission to create categories. Contact server owner.',
+        ephemeral: true
+      });
+    }
   }
 
-  // Optional: Place tickets under a category
-  const PARENT_CATEGORY_ID = 'YOUR_TICKET_CATEGORY_ID_HERE'; // optional
-  const parent = PARENT_CATEGORY_ID ? guild.channels.cache.get(PARENT_CATEGORY_ID) : null;
-
+  // ====================
+  // CREATE TICKET CHANNEL
+  // ====================
   try {
-    // Create private ticket channel
     const ticketChannel = await guild.channels.create({
-      name: `${category.value}-${interaction.user.username}`.substring(0, 99),
-      type: 0, // Text channel
-      parent: parent || null,
+      name: `${categoryConfig.value}-${interaction.user.username}`.substring(0, 99),
+      type: 0, // GUILD_TEXT
+      parent: ticketCategory.id,
       permissionOverwrites: [
         {
           id: guild.roles.everyone,
           deny: [PermissionFlagsBits.ViewChannel]
         },
         {
-          id: interaction.user.id, // Ticket creator
+          id: interaction.user.id,
           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
         },
         {
-          id: client.user.id, // Bot
+          id: client.user.id,
           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
         }
       ],
-      topic: `Ticket for ${interaction.user.tag} | Category: ${category.label}`
+      topic: `Ticket for ${interaction.user.tag} | Category: ${categoryConfig.label} | Owner: ${interaction.user.id}`,
+      reason: `Ticket created by ${interaction.user.tag}`
     });
 
-    // Grant Support Role access — if applicable and NOT admin-only
-    if (supportRole && category.supportOnly && !category.adminOnly) {
+    // Grant Support Role (unless adminOnly)
+    if (!categoryConfig.adminOnly) {
       await ticketChannel.permissionOverwrites.create(supportRole, {
         ViewChannel: true,
         SendMessages: true,
@@ -89,8 +139,8 @@ async function handleTicketCreation(interaction, client, db) {
       });
     }
 
-    // Grant ALL ADMINS access — if adminOnly OR as backup
-    const admins = await guild.members.fetch();
+    // Grant ALL ADMINS
+    const admins = await guild.members.fetch({ force: true });
     const adminMembers = admins.filter(m => m.permissions.has(PermissionFlagsBits.Administrator));
 
     for (const [id, adminMember] of adminMembers) {
@@ -101,34 +151,48 @@ async function handleTicketCreation(interaction, client, db) {
       });
     }
 
-    // Send welcome message
-    const welcomeEmbed = new EmbedBuilder()
-      .setTitle(`🎫 ${category.label} Ticket`)
-      .setDescription(
-        `Hello ${interaction.user},\nA team member will assist you shortly.\n\n` +
-        `**Category:** ${category.label}\n**User:** ${interaction.user.tag}`
-      )
-      .setColor(category.adminOnly ? '#FF5555' : '#5865F2')
-      .setTimestamp()
-      .setFooter({ text: category.adminOnly ? 'Only owners can respond.' : 'Support team will respond soon.' });
+    // ======================
+    // SEND EMBED + BUTTONS — IMMEDIATELY
+    // ======================
 
-    // Ping appropriate role or @here
-    const pingContent = category.adminOnly
-      ? '@here'
-      : (supportRole ? `${supportRole}` : '@here');
+    const welcomeEmbed = new EmbedBuilder()
+      .setTitle(`🎫 ${categoryConfig.label} Ticket`)
+      .setDescription(
+        `**User:** ${interaction.user}\n` +
+        `**Category:** ${categoryConfig.label}\n\n` +
+        `> A team member will assist you shortly. Use buttons below to manage this ticket.`
+      )
+      .setColor(categoryConfig.adminOnly ? '#FF5555' : '#5865F2')
+      .setTimestamp()
+      .setFooter({ text: 'Thank you for your patience!' });
+
+    // Buttons: Claim + Close
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`ticket_claim_${ticketChannel.id}`)
+        .setLabel('_claim')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('🙋‍♂️'),
+      new ButtonBuilder()
+        .setCustomId(`ticket_close_${ticketChannel.id}`)
+        .setLabel('Close Ticket')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🔒')
+    );
 
     await ticketChannel.send({
-      content: pingContent,
-      embeds: [welcomeEmbed]
+      content: categoryConfig.adminOnly ? '@here' : `${supportRole}`,
+      embeds: [welcomeEmbed],
+      components: [row]
     });
 
     // Notify user
     await interaction.followUp({
-      content: `✅ Your ticket has been created: ${ticketChannel.toString()} — please check there.`,
+      content: `✅ Your ticket has been created: ${ticketChannel} — please check there.`,
       ephemeral: true
     });
 
-    console.log(`🎟️ Ticket created: #${ticketChannel.name} by ${interaction.user.tag} | Category: ${category.label}`);
+    console.log(`🎟️ Ticket created: #${ticketChannel.name} by ${interaction.user.tag}`);
 
   } catch (error) {
     console.error('❌ Ticket creation failed:', error);
@@ -137,4 +201,77 @@ async function handleTicketCreation(interaction, client, db) {
       ephemeral: true
     });
   }
+}
+
+// ================
+// CLOSE TICKET
+// ================
+
+async function handleCloseTicket(interaction, client, db) {
+  if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+    return interaction.reply({
+      content: '⛔ You need **Manage Channels** permission to close tickets.',
+      ephemeral: true
+    });
+  }
+
+  await interaction.deferUpdate();
+
+  const channelId = interaction.customId.split('_')[2];
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+
+  if (!channel) {
+    return interaction.followUp({
+      content: '❌ Ticket channel not found.',
+      ephemeral: true
+    });
+  }
+
+  const transcript = [];
+  try {
+    const messages = await channel.messages.fetch({ limit: 100 });
+    messages.reverse().forEach(msg => {
+      transcript.push(`[${msg.createdAt.toLocaleString()}] ${msg.author.tag}: ${msg.content}`);
+    });
+  } catch (err) {
+    console.warn('Could not generate transcript:', err.message);
+  }
+
+  // Optional: Save transcript to file or DB here
+
+  await channel.delete('Ticket closed by user request');
+
+  await interaction.followUp({
+    content: `✅ Ticket #${channel.name} has been closed by ${interaction.user.tag}.`,
+    ephemeral: true
+  });
+}
+
+// ================
+// CLAIM TICKET
+// ================
+
+async function handleClaimTicket(interaction, client, db) {
+  await interaction.deferUpdate();
+
+  const channelId = interaction.customId.split('_')[2];
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+
+  if (!channel) {
+    return interaction.followUp({
+      content: '❌ Ticket channel not found.',
+      ephemeral: true
+    });
+  }
+
+  // Edit channel topic to show claimed status
+  const currentTopic = channel.topic || '';
+  if (!currentTopic.includes('| Claimed by:')) {
+    await channel.setTopic(`${currentTopic} | Claimed by: ${interaction.user.tag}`);
+  }
+
+  await interaction.followUp({
+    content: `🙋‍♂️ ${interaction.user} has claimed this ticket.`,
+    ephemeral: false // Let everyone in ticket see who claimed it
+  });
 }
