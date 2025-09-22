@@ -1,3 +1,5 @@
+// src/index.js
+
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const axios = require('axios');
 const fs = require('fs');
@@ -17,7 +19,12 @@ const client = new Client({
 });
 
 // Database URL — trimmed and clean
-const DB_URL = (process.env.DB_URL || 'https://web-production-c7de2.up.railway.app').trim();
+const DB_URL = (process.env.DB_URL || '').trim();
+
+if (!DB_URL) {
+  console.error('❌ DB_URL is not set in environment variables!');
+  process.exit(1);
+}
 
 // railwayDB object for database operations
 const railwayDB = {
@@ -77,7 +84,7 @@ client.securityEvents = new Collection();
 async function loadCommands() {
   const commandsPath = path.join(__dirname, 'commands');
   if (!fs.existsSync(commandsPath)) {
-    console.log('No commands directory found. Skipping command loading.');
+    console.log('⚠️ No commands directory found. Skipping command loading.');
     return;
   }
 
@@ -87,7 +94,6 @@ async function loadCommands() {
     for (const item of items) {
       const fullPath = path.join(dirPath, item.name);
       if (item.isDirectory()) {
-        // Recursively get .js files from subdirectory
         getAllJsFiles(fullPath, files);
       } else if (item.isFile() && item.name.endsWith('.js')) {
         files.push(fullPath);
@@ -97,19 +103,23 @@ async function loadCommands() {
   }
 
   const commandFiles = getAllJsFiles(commandsPath);
+  console.log(`📂 Found ${commandFiles.length} command files.`);
+
   for (const filePath of commandFiles) {
     try {
-      // Clear module cache to ensure fresh reload
       delete require.cache[require.resolve(filePath)];
       const command = require(filePath);
-      if ('data' in command && 'execute' in command) {
-        client.commands.set(command.data.name, command);
-        console.log(`Loaded command: ${command.data.name} from ${filePath}`);
-      } else {
-        console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+
+      if (!command.data?.name || typeof command.execute !== 'function') {
+        console.warn(`[⚠️] Skipping invalid command at ${filePath}`);
+        continue;
       }
+
+      client.commands.set(command.data.name, command);
+      console.log(`✅ Loaded command: ${command.data.name} from ${filePath}`);
+
     } catch (error) {
-      console.error(`❌ Error loading command at ${filePath}:`, error);
+      console.error(`❌ Failed to load command at ${filePath}:`, error.message);
     }
   }
 }
@@ -121,34 +131,40 @@ async function loadEvents() {
     console.log('❌ No events directory found. Skipping event loading.');
     return;
   }
+
   const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
   if (eventFiles.length === 0) {
     console.log('❌ No .js files found in events directory.');
     return;
   }
+
   for (const file of eventFiles) {
     const filePath = path.join(eventsPath, file);
     try {
       const event = require(filePath);
+
       if (!event.name || typeof event.execute !== 'function') {
-        console.log(`[WARNING] Event at ${filePath} is missing required "name" or "execute" property.`);
+        console.warn(`[⚠️] Skipping invalid event at ${filePath}`);
         continue;
       }
+
       const handler = (...args) => {
         if (!railwayDB || typeof railwayDB.get !== 'function') {
-          console.error(`❌ ERROR: railwayDB is invalid in event ${event.name}:`, railwayDB);
+          console.error(`❌ railwayDB broken in event ${event.name}`);
           return;
         }
         event.execute(...args, client, railwayDB);
       };
+
       if (event.once) {
         client.once(event.name, handler);
       } else {
         client.on(event.name, handler);
       }
+
       console.log(`✅ Loaded event: ${event.name}`);
     } catch (error) {
-      console.error(`❌ Error loading event ${file}:`, error);
+      console.error(`❌ Error loading event ${file}:`, error.message);
     }
   }
 }
@@ -157,29 +173,39 @@ async function loadEvents() {
 async function loadSecurityEvents() {
   const securityEventsPath = path.join(__dirname, 'sevents');
   if (!fs.existsSync(securityEventsPath)) {
-    console.log('No security events directory found. Skipping security event loading.');
+    console.log('⚠️ No security events directory found. Skipping.');
     return;
   }
+
   const securityEventFiles = fs.readdirSync(securityEventsPath).filter(file => file.endsWith('.js'));
+
   for (const file of securityEventFiles) {
     const filePath = path.join(securityEventsPath, file);
     try {
       const securityEvent = require(filePath);
+
+      if (!securityEvent.name || typeof securityEvent.execute !== 'function') {
+        console.warn(`[⚠️] Skipping invalid security event at ${filePath}`);
+        continue;
+      }
+
       const handler = (...args) => {
         if (!railwayDB || typeof railwayDB.get !== 'function') {
-          console.error(`❌ ERROR: railwayDB is invalid in security event ${securityEvent.name}:`, railwayDB);
+          console.error(`❌ railwayDB broken in security event ${securityEvent.name}`);
           return;
         }
         securityEvent.execute(...args, client, railwayDB);
       };
+
       if (securityEvent.once) {
         client.once(securityEvent.name, handler);
       } else {
         client.on(securityEvent.name, handler);
       }
-      console.log(`Loaded security event: ${securityEvent.name}`);
+
+      console.log(`✅ Loaded security event: ${securityEvent.name}`);
     } catch (error) {
-      console.error(`❌ Error loading security event ${file}:`, error);
+      console.error(`❌ Error loading security event ${file}:`, error.message);
     }
   }
 }
@@ -188,12 +214,13 @@ async function loadSecurityEvents() {
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
   const commands = [...client.commands.values()].map(cmd => cmd.data.toJSON());
+
   try {
-    console.log(`Started refreshing ${commands.length} application (/) commands.`);
+    console.log(`🔄 Registering ${commands.length} slash commands...`);
     const data = await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+    console.log(`✅ Successfully registered ${data.length} application commands.`);
   } catch (error) {
-    console.error('Error registering commands:', error);
+    console.error('❌ Error registering slash commands:', error);
   }
 }
 
@@ -203,10 +230,11 @@ async function init() {
     await loadCommands();
     await loadEvents();
     await loadSecurityEvents();
-    await client.login(process.env.DISCORD_TOKEN);
-    client.once('clientReady', async () => {
+
+    client.once('ready', async () => {
       console.log(`✅ Logged in as ${client.user.tag}!`);
       await registerCommands();
+
       // DB health check every 5 minutes
       setInterval(async () => {
         try {
@@ -216,6 +244,7 @@ async function init() {
           console.error('❌ DB Health Check Failed:', error.message);
         }
       }, 300000);
+
       // Log DB size
       try {
         const size = await railwayDB.size();
@@ -224,26 +253,38 @@ async function init() {
         console.error('❌ Could not fetch DB size:', error.message);
       }
     });
+
     // Handle interactions
     client.on('interactionCreate', async interaction => {
       if (!interaction.isChatInputCommand()) return;
+
       const command = client.commands.get(interaction.commandName);
       if (!command) {
-        console.error(`❌ No command matching ${interaction.commandName} was found.`);
+        console.warn(`⚠️ No command found for: ${interaction.commandName}`);
         return;
       }
+
       try {
         await command.execute(interaction, client, railwayDB);
       } catch (error) {
         console.error(`❌ Error executing ${interaction.commandName}:`, error);
-        await interaction.reply({
-          content: 'There was an error while executing this command!',
-          ephemeral: true
-        });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: '⚠️ There was an error while executing this command!',
+            ephemeral: true
+          });
+        } else {
+          await interaction.followUp({
+            content: '⚠️ There was an error while executing this command!',
+            ephemeral: true
+          });
+        }
       }
     });
+
+    await client.login(process.env.DISCORD_TOKEN);
   } catch (error) {
-    console.error('❌ Bot initialization error:', error);
+    console.error('❌ Bot initialization failed:', error);
     process.exit(1);
   }
 }
@@ -254,12 +295,14 @@ init();
 // HTTP Server for hosting platforms
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 app.get('/', (req, res) => {
   res.status(200).send(`Bot is online! Logged in as: ${client.user?.tag || 'Not ready yet'}`);
 });
+
 app.listen(PORT, () => {
   console.log(`✅ HTTP Server running on port ${PORT}`);
 });
 
-// Export
+// Export for testing or modularity
 module.exports = { client, db: railwayDB };
