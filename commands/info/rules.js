@@ -6,10 +6,14 @@ module.exports = {
     .setDescription('📜 Shows server guidelines.'),
 
   async execute(interaction, client, db) {
+    // 👇 DEFER FIRST — prevents "Unknown interaction" on slow ops
+    await interaction.deferReply({ ephemeral: false });
+
     try {
       let rules = await db.get(`server_rules_${interaction.guild.id}`);
+      rules = String(rules || ""); // 👈 SAFEGUARD against non-string
 
-      if (!rules) {
+      if (!rules || rules.trim() === "") {
         rules = `**📜 Server Rules & Guidelines**
 
 Welcome! To keep this community safe and enjoyable for everyone, please follow these rules. Violations may result in warnings, mutes, kicks, or bans. Use \`/report\` to notify staff of issues.
@@ -86,11 +90,10 @@ Thank you for helping us maintain a positive, safe, and fun community! 🙏`;
         await db.set(`server_rules_${interaction.guild.id}`, rules);
       }
 
-      // Split rules by section headers (---\n###)
+      // Split into sections (after intro)
       const sections = rules.split(/---\s*\n###/).map(s => s.trim());
       const [intro, ...rest] = sections;
 
-      // Create embeds
       const embeds = [];
 
       // First embed: Intro + Section 1
@@ -101,7 +104,7 @@ Thank you for helping us maintain a positive, safe, and fun community! 🙏`;
         footer: { text: 'Page 1/8 — Use /report for issues' }
       });
 
-      // Remaining sections (2-8)
+      // Remaining sections
       rest.slice(1).forEach((section, i) => {
         const pageNum = i + 2;
         embeds.push({
@@ -112,12 +115,17 @@ Thank you for helping us maintain a positive, safe, and fun community! 🙏`;
         });
       });
 
-      // Reply with up to 10 embeds (Discord limit)
-      await interaction.reply({ embeds: embeds.slice(0, 10), ephemeral: false });
+      // Send reply (up to 10 embeds)
+      await interaction.editReply({ embeds: embeds.slice(0, 10) });
 
     } catch (error) {
       console.error('Error in /rules:', error);
-      await interaction.reply({ content: '❌ Could not load rules.', ephemeral: true });
+
+      // Use editReply since we deferred earlier
+      await interaction.editReply({
+        content: '❌ Could not load rules. Please try again later.',
+        flags: 64 // ephemeral
+      });
     }
   }
 };
