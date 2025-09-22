@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
-   new SlashCommandBuilder()
+  data: new SlashCommandBuilder() // ← YOU WERE MISSING "data:"
     .setName('remindme')
     .setDescription('⏰ Set a personal reminder.')
     .addStringOption(option =>
