@@ -45,9 +45,7 @@ async function handleTicketCreation(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  // =============
   // 🔧 CREATE "Support Team" ROLE (if missing)
-  // =============
   let supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
   if (!supportRole) {
     try {
@@ -66,9 +64,7 @@ async function handleTicketCreation(interaction, client, db) {
     }
   }
 
-  // ======================
   // 🗂️ CREATE "🎟️ Tickets" CATEGORY (if missing)
-  // ======================
   let ticketCategory = guild.channels.cache.find(
     ch => ch.type === 4 && ch.name === '🎟️ Tickets'
   );
@@ -104,15 +100,13 @@ async function handleTicketCreation(interaction, client, db) {
     }
   }
 
-  // ====================
   // 🎫 CREATE CHANNEL (FASTEST PATH)
-  // ====================
   let ticketChannel;
   try {
     ticketChannel = await guild.channels.create({
       name: `${categoryConfig.value}-${interaction.user.username}`.substring(0, 99),
       type: 0, // GUILD_TEXT
-      parent: ticketCategory.id, // USE AUTO-CREATED CATEGORY
+      parent: ticketCategory.id,
       permissionOverwrites: [
         {
           id: guild.roles.everyone,
@@ -138,10 +132,7 @@ async function handleTicketCreation(interaction, client, db) {
     });
   }
 
-  // ======================
   // 🚨 SEND EMBED + BUTTONS — INSTANT
-  // ======================
-
   const welcomeEmbed = new EmbedBuilder()
     .setTitle(`🎫 ${categoryConfig.label} Ticket`)
     .setDescription(
@@ -166,7 +157,6 @@ async function handleTicketCreation(interaction, client, db) {
       .setEmoji('🔒')
   );
 
-  // ⚡ FIRE IMMEDIATELY — NO DELAYS
   ticketChannel.send({
     content: categoryConfig.adminOnly ? '@here' : `@here`,
     embeds: [welcomeEmbed],
@@ -190,7 +180,6 @@ async function handleClaimTicket(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  // Get Support Role
   const supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
   if (!supportRole) {
     return interaction.reply({
@@ -221,7 +210,6 @@ async function handleClaimTicket(interaction, client, db) {
     });
   }
 
-  // Update topic to show claimed
   const currentTopic = channel.topic || '';
   if (!currentTopic.includes('| Claimed by:')) {
     await channel.setTopic(`${currentTopic} | Claimed by: ${interaction.user.tag}`).catch(() => {});
@@ -250,10 +238,12 @@ async function handleCloseTicket(interaction, client, db) {
     });
   }
 
-  await channel.delete('Ticket closed by user request').catch(() => {});
-
+  // ✅ Send confirmation first
   await interaction.followUp({
     content: `✅ Ticket #${channel.name} has been closed by ${interaction.user.tag}.`,
     ephemeral: true
   });
+
+  // ❌ Then delete the channel
+  await channel.delete('Ticket closed by user request').catch(() => {});
 }
