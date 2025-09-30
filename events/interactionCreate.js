@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const ticketCategories = require('../config/ticketCategories.js');
 
-const SUPPORT_ROLE_ID = '1417152425504276613'; // Fixed Support Role ID
+const SUPPORT_ROLE_ID = '1419695081954349076'; // Fixed Support Role ID
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -92,7 +92,7 @@ async function handleTicketCreation(interaction, client, db) {
     }
   }
 
-  // 🎫 CREATE CHANNEL (FASTEST PATH)
+  // 🎫 CREATE CHANNEL
   let ticketChannel;
   try {
     ticketChannel = await guild.channels.create({
@@ -128,7 +128,7 @@ async function handleTicketCreation(interaction, client, db) {
     });
   }
 
-  // 🚨 SEND EMBED + BUTTONS — INSTANT
+  // 🚨 EMBED + BUTTONS
   const welcomeEmbed = new EmbedBuilder()
     .setTitle(`🎫 ${categoryConfig.label} Ticket`)
     .setDescription(
@@ -154,7 +154,7 @@ async function handleTicketCreation(interaction, client, db) {
   );
 
   ticketChannel.send({
-    content: categoryConfig.adminOnly ? '@here' : `@here`,
+    content: `<@&${SUPPORT_ROLE_ID}>`, // 🔔 Ping support role instead of @here
     embeds: [welcomeEmbed],
     components: [row]
   }).catch(err => console.error('Failed to send ticket message:', err));
@@ -211,9 +211,9 @@ async function handleClaimTicket(interaction, client, db) {
     await channel.setTopic(`${currentTopic} | Claimed by: ${interaction.user.tag}`).catch(() => {});
   }
 
-  await interaction.followUp({
-    content: `🙋‍♂️ ${interaction.user} has claimed this ticket.`,
-    ephemeral: false
+  // Announce claim in channel
+  await channel.send({
+    content: `🙋‍♂️ This ticket has been claimed by ${interaction.user}.`
   });
 }
 
@@ -234,12 +234,12 @@ async function handleCloseTicket(interaction, client, db) {
     });
   }
 
-  // ✅ Send confirmation first
-  await interaction.followUp({
-    content: `✅ Ticket #${channel.name} has been closed by ${interaction.user.tag}.`,
-    ephemeral: true
+  // ✅ Announce closure in channel before deleting
+  await channel.send({
+    content: `🔒 Ticket closed by ${interaction.user.tag}. This channel will be deleted shortly...`
   });
 
-  // ❌ Then delete the channel
-  await channel.delete('Ticket closed by user request').catch(() => {});
+  setTimeout(() => {
+    channel.delete('Ticket closed by user request').catch(() => {});
+  }, 3000);
 }
