@@ -28,7 +28,7 @@ module.exports = {
 };
 
 // ================
-// 🎫 HANDLE TICKET CREATION
+// 🚀 FASTEST TICKET CREATION WITH AUTO-CATEGORY
 // ================
 
 async function handleTicketCreation(interaction, client, db) {
@@ -39,33 +39,54 @@ async function handleTicketCreation(interaction, client, db) {
     return interaction.reply({ content: '❌ Invalid category.', ephemeral: true });
   }
 
+  // ACKNOWLEDGE IMMEDIATELY
   await interaction.deferUpdate();
 
   const guild = interaction.guild;
   if (!guild) return;
 
-  // 🔑 Hardcoded Support Team Role ID
-  const supportRoleId = '1419695081954349076';
-  const supportRole = guild.roles.cache.get(supportRoleId);
-
+  // 🔧 CREATE "Support Team" ROLE (if missing)
+  let supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
   if (!supportRole) {
-    return interaction.followUp({
-      content: '❌ Support Team role (ID: 1419695081954349076) not found in this server.',
-      ephemeral: true
-    });
+    try {
+      supportRole = await guild.roles.create({
+        name: 'Support Team',
+        color: '#5865F2',
+        reason: 'Auto-created for ticket system'
+      });
+      console.log(`✅ Created Support Role: ${supportRole.name}`);
+    } catch (error) {
+      console.error('❌ Failed to create Support Role:', error.message);
+      return interaction.followUp({
+        content: '❌ Bot lacks permission to create roles.',
+        ephemeral: true
+      });
+    }
   }
 
-  // 🗂️ Ensure "🎟️ Tickets" category exists
-  let ticketCategory = guild.channels.cache.find(ch => ch.type === 4 && ch.name === '🎟️ Tickets');
+  // 🗂️ CREATE "🎟️ Tickets" CATEGORY (if missing)
+  let ticketCategory = guild.channels.cache.find(
+    ch => ch.type === 4 && ch.name === '🎟️ Tickets'
+  );
+
   if (!ticketCategory) {
     try {
       ticketCategory = await guild.channels.create({
         name: '🎟️ Tickets',
         type: 4, // GUILD_CATEGORY
         permissionOverwrites: [
-          { id: guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
-          { id: supportRoleId, allow: [PermissionFlagsBits.ViewChannel] },
-          { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel] }
+          {
+            id: guild.roles.everyone,
+            deny: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: supportRole.id,
+            allow: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: client.user.id,
+            allow: [PermissionFlagsBits.ViewChannel]
+          }
         ],
         reason: 'Auto-created for ticket system'
       });
@@ -79,54 +100,28 @@ async function handleTicketCreation(interaction, client, db) {
     }
   }
 
-  // 🔍 Is this a "Contact Owners" (admin-only) ticket?
-  const isAdminTicket = categoryConfig.adminOnly === true;
-
-  // 🎫 Build permission overwrites
-  const overwrites = [
-    // Everyone denied
-    { id: guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
-    // Ticket creator
-    {
-      id: interaction.user.id,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory
-      ]
-    },
-    // Bot
-    {
-      id: client.user.id,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory
-      ]
-    }
-  ];
-
-  if (isAdminTicket) {
-    // 🔒 Admin ticket: ONLY creator + admins + bot
-    // → Do NOT add support role
-    // Admins can still view because they have implicit ViewChannel in all channels (unless denied, which we don't do)
-  } else {
-    // 👥 Regular ticket: allow Support Team
-    overwrites.push({
-      id: supportRoleId,
-      allow: [PermissionFlagsBits.ViewChannel]
-    });
-  }
-
-  // 🎯 Create ticket channel
+  // 🎫 CREATE CHANNEL (FASTEST PATH)
   let ticketChannel;
   try {
     ticketChannel = await guild.channels.create({
       name: `${categoryConfig.value}-${interaction.user.username}`.substring(0, 99),
       type: 0, // GUILD_TEXT
       parent: ticketCategory.id,
-      permissionOverwrites: overwrites,
-      topic: `Ticket for ${interaction.user.tag} | Category: ${categoryConfig.label}${isAdminTicket ? ' | 🔐 Admin Only' : ''}`,
+      permissionOverwrites: [
+        {
+          id: guild.roles.everyone,
+          deny: [PermissionFlagsBits.ViewChannel]
+        },
+        {
+          id: interaction.user.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+        },
+        {
+          id: client.user.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+        }
+      ],
+      topic: `Ticket for ${interaction.user.tag} | Category: ${categoryConfig.label}`,
       reason: `Ticket created by ${interaction.user.tag}`
     });
   } catch (error) {
@@ -137,18 +132,15 @@ async function handleTicketCreation(interaction, client, db) {
     });
   }
 
-  // 📩 Send welcome message
+  // 🚨 SEND EMBED + BUTTONS — INSTANT
   const welcomeEmbed = new EmbedBuilder()
-    .setTitle(`🎫 ${categoryConfig.label} Ticket${isAdminTicket ? ' (Admin Only)' : ''}`)
+    .setTitle(`🎫 ${categoryConfig.label} Ticket`)
     .setDescription(
       `**User:** ${interaction.user}\n` +
-      `**Category:** ${categoryConfig.label}\n` +
-      (isAdminTicket
-        ? '🔒 **This ticket is only visible to server administrators.**\n'
-        : '👥 **Visible to Support Team.**\n') +
-      `\n> A team member will assist you shortly.`
+      `**Category:** ${categoryConfig.label}\n\n` +
+      `> A team member will assist you shortly. Use buttons below to manage this ticket.`
     )
-    .setColor(isAdminTicket ? '#FF5555' : '#5865F2')
+    .setColor(categoryConfig.adminOnly ? '#FF5555' : '#5865F2')
     .setTimestamp()
     .setFooter({ text: 'Thank you for your patience!' });
 
@@ -165,38 +157,38 @@ async function handleTicketCreation(interaction, client, db) {
       .setEmoji('🔒')
   );
 
-  // Ping support only for non-admin tickets
-  const ping = isAdminTicket ? '' : `<@&${supportRoleId}>`;
-
   ticketChannel.send({
-    content: ping,
+    content: categoryConfig.adminOnly ? '@here' : `@here`,
     embeds: [welcomeEmbed],
     components: [row]
   }).catch(err => console.error('Failed to send ticket message:', err));
 
+  // NOTIFY USER
   await interaction.followUp({
     content: `✅ Your ticket has been created: ${ticketChannel} — please check there.`,
     ephemeral: true
   });
 
-  console.log(`🎟️ Ticket created: #${ticketChannel.name} by ${interaction.user.tag} ${isAdminTicket ? '[ADMIN]' : ''}`);
+  console.log(`🎟️ Ticket created: #${ticketChannel.name} by ${interaction.user.tag}`);
 }
 
 // ================
-// 🙋 CLAIM TICKET
+// 🔐 CLAIM TICKET — STAFF ONLY
 // ================
 
 async function handleClaimTicket(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  const supportRoleId = '1419695081954349076';
-  const supportRole = guild.roles.cache.get(supportRoleId);
+  const supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
   if (!supportRole) {
-    return interaction.reply({ content: '❌ Support role not found.', ephemeral: true });
+    return interaction.reply({
+      content: '❌ Support role not found.',
+      ephemeral: true
+    });
   }
 
-  const isSupport = interaction.member.roles.cache.has(supportRoleId);
+  const isSupport = interaction.member.roles.cache.has(supportRole.id);
   const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
   if (!isSupport && !isAdmin) {
@@ -212,4 +204,46 @@ async function handleClaimTicket(interaction, client, db) {
   const channel = await client.channels.fetch(channelId).catch(() => null);
 
   if (!channel) {
-    return interaction.followUp
+    return interaction.followUp({
+      content: '❌ Ticket channel not found.',
+      ephemeral: true
+    });
+  }
+
+  const currentTopic = channel.topic || '';
+  if (!currentTopic.includes('| Claimed by:')) {
+    await channel.setTopic(`${currentTopic} | Claimed by: ${interaction.user.tag}`).catch(() => {});
+  }
+
+  await interaction.followUp({
+    content: `🙋‍♂️ ${interaction.user} has claimed this ticket.`,
+    ephemeral: false
+  });
+}
+
+// ================
+// 🚪 CLOSE TICKET — ANYONE
+// ================
+
+async function handleCloseTicket(interaction, client, db) {
+  await interaction.deferUpdate();
+
+  const channelId = interaction.customId.split('_')[2];
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+
+  if (!channel) {
+    return interaction.followUp({
+      content: '❌ Ticket channel not found.',
+      ephemeral: true
+    });
+  }
+
+  // ✅ Send confirmation first
+  await interaction.followUp({
+    content: `✅ Ticket #${channel.name} has been closed by ${interaction.user.tag}.`,
+    ephemeral: true
+  });
+
+  // ❌ Then delete the channel
+  await channel.delete('Ticket closed by user request').catch(() => {});
+}
