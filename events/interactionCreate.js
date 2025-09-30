@@ -10,6 +10,8 @@ const {
 } = require('discord.js');
 const ticketCategories = require('../config/ticketCategories.js');
 
+const SUPPORT_ROLE_ID = '1417152425504276613'; // Fixed Support Role ID
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction, client, db) {
@@ -45,23 +47,13 @@ async function handleTicketCreation(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  // 🔧 CREATE "Support Team" ROLE (if missing)
-  let supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
+  // ✅ GET FIXED SUPPORT ROLE
+  const supportRole = guild.roles.cache.get(SUPPORT_ROLE_ID);
   if (!supportRole) {
-    try {
-      supportRole = await guild.roles.create({
-        name: 'Support Team',
-        color: '#5865F2',
-        reason: 'Auto-created for ticket system'
-      });
-      console.log(`✅ Created Support Role: ${supportRole.name}`);
-    } catch (error) {
-      console.error('❌ Failed to create Support Role:', error.message);
-      return interaction.followUp({
-        content: '❌ Bot lacks permission to create roles.',
-        ephemeral: true
-      });
-    }
+    return interaction.followUp({
+      content: `❌ The configured Support Role (ID: ${SUPPORT_ROLE_ID}) was not found in this server.`,
+      ephemeral: true
+    });
   }
 
   // 🗂️ CREATE "🎟️ Tickets" CATEGORY (if missing)
@@ -114,6 +106,10 @@ async function handleTicketCreation(interaction, client, db) {
         },
         {
           id: interaction.user.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+        },
+        {
+          id: supportRole.id,
           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
         },
         {
@@ -180,15 +176,15 @@ async function handleClaimTicket(interaction, client, db) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  const supportRole = guild.roles.cache.find(r => r.name === 'Support Team');
+  const supportRole = guild.roles.cache.get(SUPPORT_ROLE_ID);
   if (!supportRole) {
     return interaction.reply({
-      content: '❌ Support role not found.',
+      content: '❌ Support role not found in this server.',
       ephemeral: true
     });
   }
 
-  const isSupport = interaction.member.roles.cache.has(supportRole.id);
+  const isSupport = interaction.member.roles.cache.has(SUPPORT_ROLE_ID);
   const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
   if (!isSupport && !isAdmin) {
