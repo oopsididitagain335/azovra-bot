@@ -254,7 +254,7 @@ async function init() {
       }
     });
 
-    // Handle interactions
+    // Handle interactions (slash commands)
     client.on('interactionCreate', async interaction => {
       if (!interaction.isChatInputCommand()) return;
 
@@ -278,6 +278,64 @@ async function init() {
             content: '⚠️ There was an error while executing this command!',
             ephemeral: true
           });
+        }
+      }
+    });
+
+    // 👇 TEXT COMMAND HANDLER FOR `.purge`
+    client.on('messageCreate', async message => {
+      // Ignore bots, DMs, or messages that don't start with '.'
+      if (message.author.bot || !message.guild || !message.content.startsWith('.')) return;
+
+      const args = message.content.slice(1).trim().split(/ +/);
+      const command = args.shift()?.toLowerCase();
+
+      if (command === 'purge') {
+        // Only allow specific user
+        if (message.author.id !== '1400281740978815118') {
+          const reply = await message.reply('❌ You are not authorized to use this command.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        // Check bot permissions
+        if (!message.channel.permissionsFor(message.guild.members.me)?.has('ManageMessages')) {
+          const reply = await message.reply('❌ I need **Manage Messages** permission to purge.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        const amount = parseInt(args[0]);
+        if (!amount || amount < 1 || amount > 100) {
+          const reply = await message.reply('❌ Please provide a number between **1 and 100**.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        try {
+          // Fetch messages (including the command message)
+          const messages = await message.channel.messages.fetch({ limit: amount + 1 });
+          const filtered = messages.filter(msg => !msg.pinned); // don't delete pinned
+
+          if (filtered.size < 2) {
+            // If only 1 message (or none) to delete, delete individually
+            await message.delete().catch(() => {});
+            if (filtered.size === 1) {
+              const msgToDelete = filtered.first();
+              if (msgToDelete.id !== message.id) await msgToDelete.delete().catch(() => {});
+            }
+            const reply = await message.channel.send(`✅ Deleted **${filtered.size - 1}** message(s).`);
+            setTimeout(() => reply.delete().catch(() => {}), 3000);
+          } else {
+            // Bulk delete (2–100 messages)
+            await message.channel.bulkDelete(filtered, true).catch(() => {});
+            const reply = await message.channel.send(`✅ Deleted **${filtered.size - 1}** message(s).`);
+            setTimeout(() => reply.delete().catch(() => {}), 3000);
+          }
+        } catch (error) {
+          console.error('Purge error:', error);
+          const reply = await message.reply('❌ Failed to purge messages.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
         }
       }
     });
