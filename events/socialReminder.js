@@ -7,7 +7,7 @@ module.exports = {
   async execute(client) {
     console.log('✅ Social reminder system initialized.');
     const DEFAULT_X_LINK = "https://x.com/theazorva";
-    const DEFAULT_ANNOUNCE_CHANNEL_ID = "1414002877617143818";
+    const DEFAULT_ANNOUNCE_CHANNEL_ID = "1416834521327996928";
     const DEFAULT_SOCIALS_CHANNEL_ID = "1417169776916168714";
 
     const DB_URL = 'https://web-production-c7de2.up.railway.app';
