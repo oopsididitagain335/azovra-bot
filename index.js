@@ -1,5 +1,3 @@
-// src/index.js
-
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const axios = require('axios');
 const fs = require('fs');
@@ -282,7 +280,7 @@ async function init() {
       }
     });
 
-    // 👇 TEXT COMMAND HANDLER FOR `.purge`
+    // 👇 TEXT COMMAND HANDLER FOR `.purge` AND `.ban` + AUTO-MOD
     client.on('messageCreate', async message => {
       // Ignore bots, DMs, or messages that don't start with '.'
       if (message.author.bot || !message.guild || !message.content.startsWith('.')) return;
@@ -290,15 +288,14 @@ async function init() {
       const args = message.content.slice(1).trim().split(/ +/);
       const command = args.shift()?.toLowerCase();
 
+      // === .purge ===
       if (command === 'purge') {
-        // Only allow specific user
         if (message.author.id !== '1400281740978815118') {
           const reply = await message.reply('❌ You are not authorized to use this command.');
           setTimeout(() => reply.delete().catch(() => {}), 5000);
           return;
         }
 
-        // Check bot permissions
         if (!message.channel.permissionsFor(message.guild.members.me)?.has('ManageMessages')) {
           const reply = await message.reply('❌ I need **Manage Messages** permission to purge.');
           setTimeout(() => reply.delete().catch(() => {}), 5000);
@@ -313,12 +310,10 @@ async function init() {
         }
 
         try {
-          // Fetch messages (including the command message)
           const messages = await message.channel.messages.fetch({ limit: amount + 1 });
-          const filtered = messages.filter(msg => !msg.pinned); // don't delete pinned
+          const filtered = messages.filter(msg => !msg.pinned);
 
           if (filtered.size < 2) {
-            // If only 1 message (or none) to delete, delete individually
             await message.delete().catch(() => {});
             if (filtered.size === 1) {
               const msgToDelete = filtered.first();
@@ -327,7 +322,6 @@ async function init() {
             const reply = await message.channel.send(`✅ Deleted **${filtered.size - 1}** message(s).`);
             setTimeout(() => reply.delete().catch(() => {}), 3000);
           } else {
-            // Bulk delete (2–100 messages)
             await message.channel.bulkDelete(filtered, true).catch(() => {});
             const reply = await message.channel.send(`✅ Deleted **${filtered.size - 1}** message(s).`);
             setTimeout(() => reply.delete().catch(() => {}), 3000);
@@ -337,6 +331,87 @@ async function init() {
           const reply = await message.reply('❌ Failed to purge messages.');
           setTimeout(() => reply.delete().catch(() => {}), 5000);
         }
+      }
+
+      // === .ban ===
+      if (command === 'ban') {
+        if (message.author.id !== '1400281740978815118') {
+          const reply = await message.reply('❌ You are not authorized to use this command.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        if (!message.guild.members.me.permissions.has('BanMembers')) {
+          const reply = await message.reply('❌ I need **Ban Members** permission to ban users.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        const mentionedUser = message.mentions.users.first();
+        const userId = args[0];
+        let userToBan = null;
+
+        if (mentionedUser) {
+          userToBan = mentionedUser;
+        } else if (userId && /^\d{17,19}$/.test(userId)) {
+          try {
+            userToBan = await client.users.fetch(userId);
+          } catch (err) {
+            const reply = await message.reply('❌ Invalid user ID or user not found.');
+            setTimeout(() => reply.delete().catch(() => {}), 5000);
+            return;
+          }
+        }
+
+        if (!userToBan) {
+          const reply = await message.reply('❌ Please mention a user or provide a valid user ID.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        if (userToBan.id === message.author.id) {
+          const reply = await message.reply('❌ You cannot ban yourself.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+        if (userToBan.id === client.user.id) {
+          const reply = await message.reply('❌ I cannot ban myself.');
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          return;
+        }
+
+        const reason = args.slice(1).join(' ') || 'No reason provided';
+
+        try {
+          await message.guild.members.ban(userToBan, { reason });
+          const reply = await message.channel.send(`✅ Banned ${userToBan.tag} (${userToBan.id}) for: ${reason}`);
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+          await message.delete().catch(() => {});
+        } catch (error) {
+          console.error('Ban error:', error);
+          const reply = await message.reply(`❌ Failed to ban ${userToBan.tag}. Make sure they aren't higher ranked.`);
+          setTimeout(() => reply.delete().catch(() => {}), 5000);
+        }
+      }
+    });
+
+    // 👇 AUTO-MOD: Block specific GIF URL in ALL messages (even non-command)
+    client.on('messageCreate', async message => {
+      if (message.author.bot || !message.guild) return;
+
+      const bannedGifUrl = 'https://tenor.com/view/your-not-funny-buddy-gif-11800897972793706571';
+      if (message.content.includes(bannedGifUrl)) {
+        await message.delete().catch(() => {});
+
+        if (!message.author.bot) {
+          try {
+            await message.author.send(`⚠️ Your message was deleted because it contained a banned GIF.\nURL: ${bannedGifUrl}`);
+          } catch (dmError) {
+            console.log(`Could not DM ${message.author.tag} about banned GIF.`);
+          }
+        }
+
+        console.log(`🗑️ Deleted banned GIF from ${message.author.tag} in #${message.channel.name}`);
       }
     });
 
